@@ -126,6 +126,41 @@ describe("Container", () => {
     expect(result.apiClient.baseUrl).toBe("second");
   });
 
+  it("overrides a dependency at runtime without changing build requirements", async () => {
+    const createApiClient = vi.fn(inject(ApiClient));
+    const fakeApiClient = new ApiClient({ baseUrl: "fake" });
+    const builderWithoutOverrides = defineContainer<Definition>()
+      .graph(dependencies)
+      .factories({
+        apiClient: createApiClient,
+        service: inject(Service),
+      });
+    const builder = builderWithoutOverrides.override({ apiClient: fakeApiClient });
+
+    type BuildWithoutOverrides = typeof builderWithoutOverrides.build;
+    type BuildWithOverrides = typeof builder.build;
+    expectTypeOf<BuildWithOverrides>().toEqualTypeOf<BuildWithoutOverrides>();
+
+    const service = await builder.build({ baseUrl: "required" }).get("service");
+
+    expect(service.apiClient).toBe(fakeApiClient);
+    expect(createApiClient).not.toHaveBeenCalled();
+  });
+
+  it("gives runtime overrides precedence over build values during full resolution", async () => {
+    const result = await defineContainer<Definition>()
+      .graph(dependencies)
+      .factories({
+        apiClient: inject(ApiClient),
+        service: inject(Service),
+      })
+      .override({ baseUrl: "override" })
+      .resolve({ baseUrl: "build" });
+
+    expect(result.baseUrl).toBe("override");
+    expect(result.apiClient.baseUrl).toBe("override");
+  });
+
   it("does not share pending factories between containers using the same values object", async () => {
     type SharedDefinition = {
       seed: string;

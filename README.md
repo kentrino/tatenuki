@@ -100,6 +100,23 @@ The resulting function preserves all arguments after the dependency object and
 the original return type, including promises. This keeps dependencies explicit
 in the function definition without requiring callers to pass them repeatedly.
 
+## Override values in tests
+
+Call `override()` before `build()` or `resolve()` to replace selected
+dependencies at runtime:
+
+```ts
+const container = builder
+  .override({ apiClient: fakeApiClient })
+  .build({ apiUrl: "https://api.example.com" });
+```
+
+Overrides take precedence over both registered factories and values passed to
+`build()` or `resolve()`. They do not change type-level factory tracking, so
+`build()` still requires the same values it required before `override()` was
+called. Each call returns a new builder and does not affect containers built
+from the original.
+
 ## Lazy resolution
 
 Calling `build()` creates a fully defined container. `get()` resolves only the

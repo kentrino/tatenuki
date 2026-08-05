@@ -17,10 +17,11 @@ class FullyDefinedContainer<
     dependencies: D,
     factories: PartialFactories<T, D, FactoryKeys>,
     values: PartialValues<T, D, ValueKeys>,
+    overrides: Partial<T>,
   ) {
     this.dependencies = dependencies;
     this.registeredFactories = factories;
-    this.resolved = { ...values } as Partial<T>;
+    this.resolved = { ...values, ...overrides } as Partial<T>;
   }
 
   async get<K extends keyof T>(key: K): Promise<T[K]> {
@@ -43,15 +44,18 @@ export class Container<
   private readonly dependencies: D;
   private readonly registeredFactories: PartialFactories<T, D, FactoryKeys>;
   private readonly values: PartialValues<T, D, ValueKeys>;
+  private readonly overrides: Partial<T>;
 
   constructor(
     dependencies: D,
     factories: PartialFactories<T, D, FactoryKeys> = {} as PartialFactories<T, D, FactoryKeys>,
     values: PartialValues<T, D, ValueKeys> = {} as PartialValues<T, D, ValueKeys>,
+    overrides: Partial<T> = {},
   ) {
     this.dependencies = dependencies;
     this.registeredFactories = factories;
     this.values = values;
+    this.overrides = overrides;
   }
 
   factory<NewFactoryKeys extends keyof D>(
@@ -64,6 +68,7 @@ export class Container<
         ...factories,
       } as PartialFactories<T, D, FactoryKeys | NewFactoryKeys>,
       this.values,
+      this.overrides,
     );
   }
 
@@ -73,10 +78,22 @@ export class Container<
     return this.factory(factories);
   }
 
+  override(overrides: Partial<T>): Container<T, D, FactoryKeys, ValueKeys> {
+    return new Container(this.dependencies, this.registeredFactories, this.values, {
+      ...this.overrides,
+      ...overrides,
+    });
+  }
+
   value(
     values: PartialValues<T, D, Exclude<keyof D, FactoryKeys>>,
   ): FullyDefinedContainer<T, D, FactoryKeys, Exclude<keyof D, FactoryKeys>> {
-    return new FullyDefinedContainer(this.dependencies, this.registeredFactories, values);
+    return new FullyDefinedContainer(
+      this.dependencies,
+      this.registeredFactories,
+      values,
+      this.overrides,
+    );
   }
 
   build(
@@ -86,7 +103,15 @@ export class Container<
   }
 
   async resolve(values: PartialValues<T, D, Exclude<keyof D, FactoryKeys>>): Promise<T> {
-    return resolve(this.dependencies, this.registeredFactories, values);
+    const valuesWithOverrides = {
+      ...values,
+      ...this.overrides,
+    } as PartialValues<T, D, Exclude<keyof D, FactoryKeys>>;
+    return resolve<T, D, FactoryKeys, Exclude<keyof D, FactoryKeys>>(
+      this.dependencies,
+      this.registeredFactories,
+      valuesWithOverrides,
+    );
   }
 }
 
