@@ -16,7 +16,7 @@ class FullyDefinedContainer<
   constructor(
     dependencies: D,
     factories: PartialFactories<T, D, FactoryKeys>,
-    values: PartialValues<T, D, ValueKeys>,
+    values: PartialValues<T, ValueKeys>,
     overrides: Partial<T>,
   ) {
     this.dependencies = dependencies;
@@ -43,13 +43,13 @@ export class Container<
 > {
   private readonly dependencies: D;
   private readonly registeredFactories: PartialFactories<T, D, FactoryKeys>;
-  private readonly values: PartialValues<T, D, ValueKeys>;
+  private readonly values: PartialValues<T, ValueKeys>;
   private readonly overrides: Partial<T>;
 
   constructor(
     dependencies: D,
     factories: PartialFactories<T, D, FactoryKeys> = {} as PartialFactories<T, D, FactoryKeys>,
-    values: PartialValues<T, D, ValueKeys> = {} as PartialValues<T, D, ValueKeys>,
+    values: PartialValues<T, ValueKeys> = {} as PartialValues<T, ValueKeys>,
     overrides: Partial<T> = {},
   ) {
     this.dependencies = dependencies;
@@ -86,7 +86,7 @@ export class Container<
   }
 
   value(
-    values: PartialValues<T, D, Exclude<keyof D, FactoryKeys>>,
+    values: PartialValues<T, Exclude<keyof D, FactoryKeys>>,
   ): FullyDefinedContainer<T, D, FactoryKeys, Exclude<keyof D, FactoryKeys>> {
     return new FullyDefinedContainer(
       this.dependencies,
@@ -97,16 +97,16 @@ export class Container<
   }
 
   build(
-    values: PartialValues<T, D, Exclude<keyof D, FactoryKeys>>,
+    values: PartialValues<T, Exclude<keyof D, FactoryKeys>>,
   ): FullyDefinedContainer<T, D, FactoryKeys, Exclude<keyof D, FactoryKeys>> {
     return this.value(values);
   }
 
-  async resolve(values: PartialValues<T, D, Exclude<keyof D, FactoryKeys>>): Promise<T> {
+  async resolve(values: PartialValues<T, Exclude<keyof D, FactoryKeys>>): Promise<T> {
     const valuesWithOverrides = {
       ...values,
       ...this.overrides,
-    } as PartialValues<T, D, Exclude<keyof D, FactoryKeys>>;
+    } as PartialValues<T, Exclude<keyof D, FactoryKeys>>;
     return resolve<T, D, FactoryKeys, Exclude<keyof D, FactoryKeys>>(
       this.dependencies,
       this.registeredFactories,

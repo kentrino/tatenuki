@@ -75,7 +75,7 @@ describe("container value and factory types", () => {
   });
 
   it("selects values and factories by key", () => {
-    type SelectedValues = PartialValues<Definition, typeof graph, "config" | "service">;
+    type SelectedValues = PartialValues<Definition, "config" | "service">;
     type SelectedFactories = PartialFactories<Definition, typeof graph, "repository" | "service">;
 
     expectTypeOf<keyof SelectedValues>().toEqualTypeOf<"config" | "service">();

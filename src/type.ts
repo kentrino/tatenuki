@@ -39,11 +39,7 @@ export type Factory<
   K extends keyof D = keyof D,
 > = (dependencies: Pick<T, D[K][number] & keyof T>) => T[K] | Promise<T[K]>;
 
-export type PartialValues<
-  T extends UnknownObject,
-  D extends DependenciesOf<D, keyof T>,
-  K extends keyof D = keyof D,
-> = {
+export type PartialValues<T extends UnknownObject, K extends keyof T = keyof T> = {
   [P in K]: T[P];
 };
 

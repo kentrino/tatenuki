@@ -8,7 +8,7 @@ export async function resolve<
 >(
   dependencies: D,
   factories: PartialFactories<T, D, FactoryKeys>,
-  values: PartialValues<T, D, ValueKeys>,
+  values: PartialValues<T, ValueKeys>,
 ): Promise<T> {
   const result = values as T;
   const resolved = new Set<keyof T>(Reflect.ownKeys(values) as (keyof T)[]);
