@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it, vi } from "vite-plus/test";
-import { Container, inject } from "./container.ts";
+import { Container, defineContainer, inject } from "./container.ts";
 import { get } from "./get.ts";
 import { resolve } from "./resolve.ts";
 import type { DependencyGraph } from "./type.ts";
@@ -33,6 +33,34 @@ const dependencies = {
 } as const satisfies DependencyGraph<Definition>;
 
 describe("Container", () => {
+  it("infers the graph type through the builder API", async () => {
+    const container = defineContainer<Definition>()
+      .graph(dependencies)
+      .factories({
+        apiClient: inject(ApiClient),
+        service: inject(Service),
+      })
+      .build({ baseUrl: "https://example.com" });
+
+    const service = await container.get("service");
+
+    expectTypeOf(service).toEqualTypeOf<Service>();
+    expect(service.apiClient.baseUrl).toBe("https://example.com");
+  });
+
+  it("builds and resolves the entire graph eagerly through the builder API", async () => {
+    const result = await defineContainer<Definition>()
+      .graph(dependencies)
+      .factories({
+        apiClient: inject(ApiClient),
+        service: inject(Service),
+      })
+      .buildEager({ baseUrl: "https://example.com" });
+
+    expectTypeOf(result).toEqualTypeOf<Definition>();
+    expect(result.service.apiClient.baseUrl).toBe("https://example.com");
+  });
+
   it("resolves chained factories and values", async () => {
     const result = await new Container<Definition, typeof dependencies>(dependencies)
       .factory({

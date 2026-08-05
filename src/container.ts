@@ -9,7 +9,7 @@ class FullyDefinedContainer<
   ValueKeys extends keyof D = never,
 > {
   private readonly dependencies: D;
-  private readonly factories: PartialFactories<T, D, FactoryKeys>;
+  private readonly registeredFactories: PartialFactories<T, D, FactoryKeys>;
   private readonly pending = new Map<PropertyKey, Promise<unknown>>();
   readonly resolved: Partial<T>;
 
@@ -19,7 +19,7 @@ class FullyDefinedContainer<
     values: PartialValues<T, D, ValueKeys>,
   ) {
     this.dependencies = dependencies;
-    this.factories = factories;
+    this.registeredFactories = factories;
     this.resolved = { ...values } as Partial<T>;
   }
 
@@ -27,7 +27,7 @@ class FullyDefinedContainer<
     return get(
       this.dependencies,
       this.resolved,
-      this.factories as unknown as Partial<Record<keyof T, (dependencies: T) => unknown>>,
+      this.registeredFactories as unknown as Partial<Record<keyof T, (dependencies: T) => unknown>>,
       key,
       this.pending,
     );
@@ -41,7 +41,7 @@ export class Container<
   ValueKeys extends keyof D = never,
 > {
   private readonly dependencies: D;
-  private readonly factories: PartialFactories<T, D, FactoryKeys>;
+  private readonly registeredFactories: PartialFactories<T, D, FactoryKeys>;
   private readonly values: PartialValues<T, D, ValueKeys>;
 
   constructor(
@@ -50,7 +50,7 @@ export class Container<
     values: PartialValues<T, D, ValueKeys> = {} as PartialValues<T, D, ValueKeys>,
   ) {
     this.dependencies = dependencies;
-    this.factories = factories;
+    this.registeredFactories = factories;
     this.values = values;
   }
 
@@ -60,22 +60,46 @@ export class Container<
     return new Container<T, D, FactoryKeys | NewFactoryKeys, ValueKeys>(
       this.dependencies,
       {
-        ...this.factories,
+        ...this.registeredFactories,
         ...factories,
       } as PartialFactories<T, D, FactoryKeys | NewFactoryKeys>,
       this.values,
     );
   }
 
+  factories<NewFactoryKeys extends keyof D>(
+    factories: PartialFactories<T, D, NewFactoryKeys>,
+  ): Container<T, D, FactoryKeys | NewFactoryKeys, ValueKeys> {
+    return this.factory(factories);
+  }
+
   value(
     values: PartialValues<T, D, Exclude<keyof D, FactoryKeys>>,
   ): FullyDefinedContainer<T, D, FactoryKeys, Exclude<keyof D, FactoryKeys>> {
-    return new FullyDefinedContainer(this.dependencies, this.factories, values);
+    return new FullyDefinedContainer(this.dependencies, this.registeredFactories, values);
+  }
+
+  build(
+    values: PartialValues<T, D, Exclude<keyof D, FactoryKeys>>,
+  ): FullyDefinedContainer<T, D, FactoryKeys, Exclude<keyof D, FactoryKeys>> {
+    return this.value(values);
   }
 
   async resolve(values: PartialValues<T, D, Exclude<keyof D, FactoryKeys>>): Promise<T> {
-    return resolve(this.dependencies, this.factories, values);
+    return resolve(this.dependencies, this.registeredFactories, values);
   }
+
+  async buildEager(values: PartialValues<T, D, Exclude<keyof D, FactoryKeys>>): Promise<T> {
+    return this.resolve(values);
+  }
+}
+
+export function defineContainer<T extends Record<PropertyKey, unknown>>() {
+  return {
+    graph<const D extends DependenciesOf<D, keyof T>>(dependencies: D): Container<T, D> {
+      return new Container<T, D>(dependencies);
+    },
+  };
 }
 
 export function inject<Input, Output>(
