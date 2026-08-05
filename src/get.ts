@@ -1,6 +1,8 @@
 type UnknownObject = Record<PropertyKey, unknown>;
 type UnknownFactory<T extends UnknownObject> = (dependencies: T) => unknown;
 
+const pendingByResolved = new WeakMap<object, Map<PropertyKey, Promise<unknown>>>();
+
 export async function get<T extends UnknownObject, K extends keyof T>(
   graph: Record<PropertyKey, readonly PropertyKey[]>,
   resolved: Partial<T>,
@@ -13,9 +15,17 @@ export async function get<T extends UnknownObject, K extends keyof T>(
 
   const visiting = new Set<PropertyKey>();
   const visited = new Set<PropertyKey>();
+  const pending = pendingByResolved.get(resolved) ?? new Map<PropertyKey, Promise<unknown>>();
+  pendingByResolved.set(resolved, pending);
 
   const initialize = async (dependencyKey: keyof T): Promise<void> => {
     if (Object.hasOwn(resolved, dependencyKey)) {
+      return;
+    }
+
+    const pendingValue = pending.get(dependencyKey);
+    if (pendingValue) {
+      resolved[dependencyKey] = (await pendingValue) as T[typeof dependencyKey];
       return;
     }
 
@@ -23,7 +33,14 @@ export async function get<T extends UnknownObject, K extends keyof T>(
     if (!factory) {
       throw new Error(`No factory for ${String(dependencyKey)}`);
     }
-    resolved[dependencyKey] = (await factory(resolved as T)) as T[typeof dependencyKey];
+
+    const factoryResult = Promise.resolve(factory(resolved as T));
+    pending.set(dependencyKey, factoryResult);
+    try {
+      resolved[dependencyKey] = (await factoryResult) as T[typeof dependencyKey];
+    } finally {
+      pending.delete(dependencyKey);
+    }
   };
 
   const visit = async (dependencyKey: PropertyKey): Promise<boolean> => {
