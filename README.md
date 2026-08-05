@@ -57,6 +57,49 @@ Keep container construction in an entrypoint. Domain, application, and adapter
 code should continue to receive explicit dependencies rather than importing the
 container.
 
+## Inject classes and functions
+
+`inject()` adapts a class whose constructor takes a dependency object into a
+container factory, as shown above. It can also adapt a function whose first
+argument is a dependency object:
+
+```ts
+type HttpClient = {
+  get<T>(path: string): Promise<T>;
+};
+type User = {
+  id: string;
+};
+
+function findUser({ httpClient }: { httpClient: HttpClient }, userId: string) {
+  return httpClient.get<User>(`/users/${userId}`);
+}
+
+type FindUser = (userId: string) => Promise<User>;
+
+type Definition = {
+  httpClient: HttpClient;
+  findUser: FindUser;
+};
+
+const dependencies = {
+  httpClient: [],
+  findUser: ["httpClient"],
+} as const satisfies DependencyGraph<Definition>;
+
+const container = defineContainer<Definition>()
+  .graph(dependencies)
+  .factories({ findUser: inject(findUser) })
+  .build({ httpClient });
+
+const findUserWithDependencies = await container.get("findUser");
+const user = await findUserWithDependencies("user-id");
+```
+
+The resulting function preserves all arguments after the dependency object and
+the original return type, including promises. This keeps dependencies explicit
+in the function definition without requiring callers to pass them repeatedly.
+
 ## Lazy resolution
 
 Calling `build()` creates a fully defined container. `get()` resolves only the
@@ -103,7 +146,10 @@ is missing or when a circular dependency is encountered.
   `build()` creates an isolated cache.
 - Concurrent `get()` calls in the same container share pending factory work.
 - `inject(SomeClass)` supports classes whose constructor takes one dependency
-  object. Register a function directly for other constructor shapes.
+  object. `inject(someFunction)` binds the dependency object passed as the
+  function's first argument.
+- Register classes with other constructor shapes and functions that do not take
+  dependencies first using a custom factory.
 - Registering the same factory key again replaces the earlier factory.
 
 ## Lower-level API

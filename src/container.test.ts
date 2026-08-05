@@ -33,6 +33,29 @@ const dependencies = {
 } as const satisfies DependencyGraph<Definition>;
 
 describe("Container", () => {
+  it("injects dependencies into a function's first argument", async () => {
+    type FunctionDefinition = {
+      apiClient: ApiClient;
+      findUser: (userId: string) => string;
+    };
+    const functionDependencies = {
+      apiClient: [],
+      findUser: ["apiClient"],
+    } as const satisfies DependencyGraph<FunctionDefinition>;
+    function findUser({ apiClient }: { apiClient: ApiClient }, userId: string) {
+      return `${apiClient.baseUrl}/users/${userId}`;
+    }
+    const container = defineContainer<FunctionDefinition>()
+      .graph(functionDependencies)
+      .factories({ findUser: inject(findUser) })
+      .build({ apiClient: new ApiClient({ baseUrl: "https://example.com" }) });
+
+    const injectedFindUser = await container.get("findUser");
+
+    expectTypeOf(injectedFindUser).toEqualTypeOf<(userId: string) => string>();
+    expect(injectedFindUser("42")).toBe("https://example.com/users/42");
+  });
+
   it("infers the graph type through the builder API", async () => {
     const container = defineContainer<Definition>()
       .graph(dependencies)

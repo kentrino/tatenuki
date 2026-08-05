@@ -100,6 +100,18 @@ export function defineContainer<T extends Record<PropertyKey, unknown>>() {
 
 export function inject<Input, Output>(
   constructor: new (dependencies: Input) => Output,
-): (dependencies: Input) => Output {
-  return (dependencies) => new constructor(dependencies);
+): (dependencies: Input) => Output;
+export function inject<Input, Arguments extends unknown[], Output>(
+  fn: (dependencies: Input, ...arguments_: Arguments) => Output,
+): (dependencies: Input) => (...arguments_: Arguments) => Output;
+export function inject(target: unknown): unknown {
+  return (dependencies: unknown) => {
+    if (/^class\s/.test(Function.prototype.toString.call(target))) {
+      const Constructor = target as new (dependencies: unknown) => unknown;
+      return new Constructor(dependencies);
+    }
+
+    const fn = target as (dependencies: unknown, ...arguments_: unknown[]) => unknown;
+    return (...arguments_: unknown[]) => fn(dependencies, ...arguments_);
+  };
 }
