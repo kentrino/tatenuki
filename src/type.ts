@@ -44,14 +44,10 @@ export type PartialValues<
   D extends DependenciesOf<D, keyof T>,
   K extends keyof D = keyof D,
 > = {
-  [P in K]: Value<T, D, P>;
+  [P in K]: Value<T, P>;
 };
 
-export type Value<
-  T extends UnknownObject,
-  D extends DependenciesOf<D, keyof T>,
-  K extends keyof D = keyof D,
-> = T[K];
+export type Value<T extends UnknownObject, K extends keyof T = keyof T> = T[K];
 
 export type PartialFactories<
   T extends UnknownObject,

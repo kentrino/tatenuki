@@ -79,9 +79,7 @@ describe("container value and factory types", () => {
     type SelectedValues = PartialValues<Definition, typeof graph, "config" | "service">;
     type SelectedFactories = PartialFactories<Definition, typeof graph, "repository" | "service">;
 
-    expectTypeOf<Value<Definition, typeof graph, "service">>().toEqualTypeOf<
-      Definition["service"]
-    >();
+    expectTypeOf<Value<Definition, "service">>().toEqualTypeOf<Definition["service"]>();
     expectTypeOf<keyof SelectedValues>().toEqualTypeOf<"config" | "service">();
     expectTypeOf<SelectedValues["config"]>().toEqualTypeOf<string>();
     expectTypeOf<SelectedValues["service"]>().toEqualTypeOf<Definition["service"]>();
