@@ -1,13 +1,12 @@
 type UnknownObject = Record<PropertyKey, unknown>;
 type UnknownFactory<T extends UnknownObject> = (dependencies: T) => unknown;
 
-const pendingByResolved = new WeakMap<object, Map<PropertyKey, Promise<unknown>>>();
-
 export async function get<T extends UnknownObject, K extends keyof T>(
   graph: Record<PropertyKey, readonly PropertyKey[]>,
   resolved: Partial<T>,
   factories: Partial<Record<keyof T, UnknownFactory<T>>>,
   key: K,
+  pending = new Map<PropertyKey, Promise<unknown>>(),
 ): Promise<T[K]> {
   if (Object.hasOwn(resolved, key)) {
     return resolved[key] as T[K];
@@ -15,8 +14,6 @@ export async function get<T extends UnknownObject, K extends keyof T>(
 
   const visiting = new Set<PropertyKey>();
   const visited = new Set<PropertyKey>();
-  const pending = pendingByResolved.get(resolved) ?? new Map<PropertyKey, Promise<unknown>>();
-  pendingByResolved.set(resolved, pending);
 
   const initialize = async (dependencyKey: keyof T): Promise<void> => {
     if (Object.hasOwn(resolved, dependencyKey)) {

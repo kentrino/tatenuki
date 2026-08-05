@@ -10,6 +10,7 @@ class FullyDefinedContainer<
 > {
   private readonly dependencies: D;
   private readonly factories: PartialFactories<T, D, FactoryKeys>;
+  private readonly pending = new Map<PropertyKey, Promise<unknown>>();
   readonly resolved: Partial<T>;
 
   constructor(
@@ -19,7 +20,7 @@ class FullyDefinedContainer<
   ) {
     this.dependencies = dependencies;
     this.factories = factories;
-    this.resolved = values as Partial<T>;
+    this.resolved = { ...values } as Partial<T>;
   }
 
   async get<K extends keyof T>(key: K): Promise<T[K]> {
@@ -28,6 +29,7 @@ class FullyDefinedContainer<
       this.resolved,
       this.factories as unknown as Partial<Record<keyof T, (dependencies: T) => unknown>>,
       key,
+      this.pending,
     );
   }
 }

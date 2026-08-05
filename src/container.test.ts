@@ -74,6 +74,42 @@ describe("Container", () => {
 
     expect(result.apiClient.baseUrl).toBe("second");
   });
+
+  it("does not share pending factories between containers using the same values object", async () => {
+    type SharedDefinition = {
+      seed: string;
+      service: string;
+    };
+    const sharedDependencies = {
+      seed: [],
+      service: ["seed"],
+    } as const;
+    const sharedValues = { seed: "seed" };
+    let release: () => void = () => undefined;
+    const blocked = new Promise<void>((resolveBlocked) => {
+      release = resolveBlocked;
+    });
+    const first = new Container<SharedDefinition, typeof sharedDependencies>(sharedDependencies)
+      .factory({
+        service: async () => {
+          await blocked;
+          return "first";
+        },
+      })
+      .value(sharedValues);
+    const second = new Container<SharedDefinition, typeof sharedDependencies>(sharedDependencies)
+      .factory({
+        service: () => "second",
+      })
+      .value(sharedValues);
+
+    const firstResult = first.get("service");
+    const secondResult = second.get("service");
+    release();
+
+    await expect(firstResult).resolves.toBe("first");
+    await expect(secondResult).resolves.toBe("second");
+  });
 });
 
 describe("resolution", () => {
@@ -175,15 +211,16 @@ describe("resolution", () => {
       await blocked;
       return "shared";
     });
-    const resolved: Partial<Values> = {};
-    const factories = {
-      shared: createShared,
-      left: ({ shared }: Values) => `${shared}-left`,
-      right: ({ shared }: Values) => `${shared}-right`,
-    };
+    const container = new Container<Values, typeof graph>(graph)
+      .factory({
+        shared: createShared,
+        left: ({ shared }) => `${shared}-left`,
+        right: ({ shared }) => `${shared}-right`,
+      })
+      .value({});
 
-    const left = get(graph, resolved, factories, "left");
-    const right = get(graph, resolved, factories, "right");
+    const left = container.get("left");
+    const right = container.get("right");
     release();
 
     await expect(Promise.all([left, right])).resolves.toEqual(["shared-left", "shared-right"]);
