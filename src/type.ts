@@ -24,9 +24,9 @@ export type DependantsOfRecursive<T extends object, Key extends keyof T> =
   | DependantsOfWithHalt<T, DependantsOfWithHalt<T, Key>>
   | DependantsOf<T, Key>;
 
-export type DependenciesOf<T extends object, KeyConstraint extends PropertyKey> = {
-  [K in keyof T & KeyConstraint]: readonly Exclude<
-    keyof T & KeyConstraint,
+export type DependenciesOf<T extends object, DefinitionKeys extends PropertyKey> = {
+  [K in keyof T & DefinitionKeys]: readonly Exclude<
+    keyof T & DefinitionKeys,
     K | DependantsOfRecursive<T, K>
   >[];
 };
