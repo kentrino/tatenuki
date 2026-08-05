@@ -48,14 +48,14 @@ describe("Container", () => {
     expect(service.apiClient.baseUrl).toBe("https://example.com");
   });
 
-  it("builds and resolves the entire graph eagerly through the builder API", async () => {
+  it("resolves the entire graph through the builder API", async () => {
     const result = await defineContainer<Definition>()
       .graph(dependencies)
       .factories({
         apiClient: inject(ApiClient),
         service: inject(Service),
       })
-      .buildEager({ baseUrl: "https://example.com" });
+      .resolve({ baseUrl: "https://example.com" });
 
     expectTypeOf(result).toEqualTypeOf<Definition>();
     expect(result.service.apiClient.baseUrl).toBe("https://example.com");

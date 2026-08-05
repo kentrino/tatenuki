@@ -88,10 +88,6 @@ export class Container<
   async resolve(values: PartialValues<T, D, Exclude<keyof D, FactoryKeys>>): Promise<T> {
     return resolve(this.dependencies, this.registeredFactories, values);
   }
-
-  async buildEager(values: PartialValues<T, D, Exclude<keyof D, FactoryKeys>>): Promise<T> {
-    return this.resolve(values);
-  }
 }
 
 export function defineContainer<T extends Record<PropertyKey, unknown>>() {

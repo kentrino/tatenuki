@@ -72,9 +72,9 @@ Concurrent requests in the same container share pending factory work. Separate
 containers keep their resolved values and pending factories isolated, even when
 created from the same values object.
 
-## Eager resolution
+## Full resolution
 
-Call `buildEager()` instead of `build()` to initialize the entire graph:
+Call `resolve()` instead of `build()` to initialize and return the entire graph:
 
 ```ts
 const resolved = await defineContainer<Definition>()
@@ -83,7 +83,7 @@ const resolved = await defineContainer<Definition>()
     apiClient: inject(ApiClient),
     todoService: inject(TodoService),
   })
-  .buildEager({ apiUrl: "https://api.example.com" });
+  .resolve({ apiUrl: "https://api.example.com" });
 
 resolved.todoService;
 ```
@@ -109,5 +109,5 @@ is missing or when a circular dependency is encountered.
 ## Lower-level API
 
 `Container` remains available when direct construction is useful. Its
-`factory()`, `value()`, and `resolve()` methods are the lower-level equivalents
-of `factories()`, `build()`, and `buildEager()`.
+`factory()` and `value()` methods are the lower-level equivalents of
+`factories()` and `build()`. `resolve()` is available with either style.
