@@ -10,6 +10,5 @@ export type {
   Factory,
   PartialFactories,
   PartialValues,
-  Value,
   ValueOf,
 } from "./type.ts";
