@@ -174,3 +174,14 @@ is missing or when a circular dependency is encountered.
 `Container` remains available when direct construction is useful. Its
 `factory()` and `value()` methods are the lower-level equivalents of
 `factories()` and `build()`. `resolve()` is available with either style.
+
+## Benchmarks
+
+Run the `resolve()` benchmarks from the repository root:
+
+```sh
+pnpm --filter @todo-sync/di bench
+```
+
+The suite compares hand-crafted best- and worst-case dependency graphs with
+deterministically generated graphs at several sizes and scan orders.
