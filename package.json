@@ -7,7 +7,8 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "bench": "vp test bench --root ../.. packages/di/src/resolve.bench.ts --run",
+    "bench:get": "vp test bench --root ../.. packages/di/src/get.bench.ts --run",
+    "bench:resolve": "vp test bench --root ../.. packages/di/src/resolve.bench.ts --run",
     "check": "vp check",
     "test": "vp test --root ../.. packages/di/src"
   },

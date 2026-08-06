@@ -177,11 +177,13 @@ is missing or when a circular dependency is encountered.
 
 ## Benchmarks
 
-Run the `resolve()` benchmarks from the repository root:
+Run a file-specific suite from the repository root:
 
 ```sh
-pnpm --filter @todo-sync/di bench
+pnpm --filter @todo-sync/di bench:resolve
+pnpm --filter @todo-sync/di bench:get
 ```
 
-The suite compares hand-crafted best- and worst-case dependency graphs with
-deterministically generated graphs at several sizes and scan orders.
+Each suite compares hand-crafted graphs with deterministically generated graphs
+at several sizes. `resolve` varies scan order; `get` always requests the leaf
+that pulls in the relevant subgraph.
