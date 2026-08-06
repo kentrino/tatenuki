@@ -220,6 +220,47 @@ describe("resolution", () => {
     expect(result.third).toBe("first-second-third");
   });
 
+  it("preserves scan-order factory execution across multiple passes", async () => {
+    type Values = {
+      first: string;
+      second: string;
+      third: string;
+      independent: string;
+    };
+    const graph = {
+      first: ["second"],
+      second: ["third"],
+      third: [],
+      independent: [],
+    } as const;
+    const executionOrder: string[] = [];
+
+    await resolve<Values, typeof graph, keyof Values>(
+      graph,
+      {
+        first: () => {
+          executionOrder.push("first");
+          return "first";
+        },
+        second: () => {
+          executionOrder.push("second");
+          return "second";
+        },
+        third: () => {
+          executionOrder.push("third");
+          return "third";
+        },
+        independent: () => {
+          executionOrder.push("independent");
+          return "independent";
+        },
+      },
+      {},
+    );
+
+    expect(executionOrder).toEqual(["third", "independent", "second", "first"]);
+  });
+
   it("reports circular dependencies", async () => {
     type Values = { first: string; second: string };
     const graph = {
