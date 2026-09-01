@@ -2,18 +2,24 @@
   "name": "tamano",
   "version": "0.0.0",
   "private": true,
+  "description": "A small, typed dependency-injection container for composition roots.",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
   },
   "scripts": {
-    "bench:get": "vp test bench --root ../.. packages/di/src/get.bench.ts --run",
-    "bench:resolve": "vp test bench --root ../.. packages/di/src/resolve.bench.ts --run",
+    "build": "vp pack",
+    "dev": "vp pack --watch",
+    "bench:get": "vp test bench src/get.bench.ts --run",
+    "bench:resolve": "vp test bench src/resolve.bench.ts --run",
     "check": "vp check",
-    "test": "vp test --root ../.. packages/di/src"
+    "test": "vp test"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "typescript": "catalog:",
+    "vite": "catalog:",
     "vite-plus": "catalog:"
   }
 }

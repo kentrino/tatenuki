@@ -1,4 +1,3 @@
-// @ts-expect-error -- This Node-only helper does not add Node types to the browser-agnostic package.
 import { createHash } from "node:crypto";
 
 export type BenchDefinition = Record<string, number>;
