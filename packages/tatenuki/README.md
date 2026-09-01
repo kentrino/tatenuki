@@ -1,13 +1,21 @@
-# DI
+# tatenuki
 
-`@todo-sync/di` is a small, typed dependency-injection container for composition
+`tatenuki` is a small, typed dependency-injection container for composition
 roots. Define the dependency graph once, register factories, and provide the
 remaining values when building a container.
+
+```sh
+npm install tatenuki
+```
+
+```ts
+import { defineContainer, inject, type DependencyGraph, type ValueOf } from "tatenuki";
+```
 
 ## Define a container
 
 ```ts
-import { defineContainer, inject, type DependencyGraph, type ValueOf } from "@todo-sync/di";
+import { defineContainer, inject, type DependencyGraph, type ValueOf } from "tatenuki";
 
 class ApiClient {
   readonly dependencies: { apiUrl: string };
@@ -180,8 +188,8 @@ is missing or when a circular dependency is encountered.
 Run a file-specific suite from the repository root:
 
 ```sh
-pnpm --filter @todo-sync/di bench:resolve
-pnpm --filter @todo-sync/di bench:get
+pnpm --filter tatenuki bench:resolve
+pnpm --filter tatenuki bench:get
 ```
 
 Each suite compares hand-crafted graphs with deterministically generated graphs
