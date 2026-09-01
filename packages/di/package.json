@@ -1,0 +1,19 @@
+{
+  "name": "@todo-sync/di",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "bench:get": "vp test bench --root ../.. packages/di/src/get.bench.ts --run",
+    "bench:resolve": "vp test bench --root ../.. packages/di/src/resolve.bench.ts --run",
+    "check": "vp check",
+    "test": "vp test --root ../.. packages/di/src"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}
