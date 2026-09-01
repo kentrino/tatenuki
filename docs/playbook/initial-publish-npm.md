@@ -127,6 +127,7 @@ Look at the files. Then publish the package.
 
 ```sh
 cd "$TARGET_DIRECTORY"
+npm run build
 npm pack --dry-run
 npm publish --access public
 npm view "$PACKAGE_NAME" name version
