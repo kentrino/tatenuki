@@ -17,9 +17,10 @@
     "test": "vp test"
   },
   "devDependencies": {
-    "@types/node": "catalog:",
-    "typescript": "catalog:",
-    "vite": "catalog:",
-    "vite-plus": "catalog:"
+    "@types/node": "^26",
+    "tsdown": "^0.22.14",
+    "typescript": "^7.0.2",
+    "vite": "npm:@voidzero-dev/vite-plus-core@0.2.8",
+    "vite-plus": "0.2.8"
   }
 }
