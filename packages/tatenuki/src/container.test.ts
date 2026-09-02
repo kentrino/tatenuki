@@ -1,3 +1,4 @@
+import { runInNewContext } from "node:vm";
 import { describe, expect, expectTypeOf, it, vi } from "vite-plus/test";
 import { alias, Container, defineContainer, inject } from "./container.ts";
 import { get } from "./get.ts";
@@ -54,6 +55,19 @@ describe("Container", () => {
 
     expectTypeOf(injectedFindUser).toEqualTypeOf<(userId: string) => string>();
     expect(injectedFindUser("42")).toBe("https://example.com/users/42");
+  });
+
+  it("injects a class expression without whitespace after the class keyword", () => {
+    const MinifiedClass = runInNewContext(
+      "(class{constructor(dependencies){this.dependencies=dependencies}})",
+    ) as new (dependencies: { value: string }) => {
+      dependencies: { value: string };
+    };
+
+    const instance = inject(MinifiedClass)({ value: "injected" });
+
+    expect(instance).toBeInstanceOf(MinifiedClass);
+    expect(instance.dependencies).toEqual({ value: "injected" });
   });
 
   it("infers the graph type through the builder API", async () => {
@@ -480,6 +494,27 @@ describe("resolution", () => {
     expect(result).toEqual({ optional: undefined, initialized: true });
   });
 
+  it("mutates the provided values object (in-place resolution behavior)", async () => {
+    type Values = {
+      seed: string;
+      service: string;
+    };
+    const graph = {
+      seed: [],
+      service: ["seed"],
+    } as const;
+    const values = { seed: "ready" };
+
+    const result = await resolve<Values, typeof graph, "service", "seed">(
+      graph,
+      { service: ({ seed }) => `${seed}-service` },
+      values,
+    );
+
+    expect(result).toBe(values);
+    expect(values).toEqual({ seed: "ready", service: "ready-service" });
+  });
+
   it("does not count values outside the graph as resolved graph entries", async () => {
     type Values = {
       seed: string;
@@ -531,5 +566,16 @@ describe("resolution", () => {
 
   it("reports a missing lazy factory with its key", async () => {
     await expect(get({ missing: [] }, {}, {}, "missing")).rejects.toThrow("No factory for missing");
+  });
+
+  it("reports a missing lazy factory for Object prototype keys", async () => {
+    await expect(
+      get<{ constructor: string }, "constructor">(
+        {} as Record<PropertyKey, readonly PropertyKey[]>,
+        {},
+        {},
+        "constructor",
+      ),
+    ).rejects.toThrow("No factory for constructor");
   });
 });

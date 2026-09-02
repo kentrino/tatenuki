@@ -31,7 +31,7 @@ export async function get<T extends UnknownObject, K extends keyof T>(
 
     visiting.add(dependencyKey);
 
-    const dependencies = graph[dependencyKey];
+    const dependencies = Object.hasOwn(graph, dependencyKey) ? graph[dependencyKey] : undefined;
     if (dependencies === undefined) {
       throw new Error(`No factory for ${String(dependencyKey)}`);
     }
