@@ -253,6 +253,240 @@ describe("Container", () => {
     await expect(firstResult).resolves.toBe("first");
     await expect(secondResult).resolves.toBe("second");
   });
+
+  it("disposes lazily created resources in reverse creation order", async () => {
+    type Values = {
+      first: Disposable;
+      second: AsyncDisposable;
+    };
+    const graph = {
+      first: [],
+      second: ["first"],
+    } as const;
+    const disposalOrder: string[] = [];
+    const container = defineContainer<Values>()
+      .graph(graph)
+      .factories({
+        first: () => ({
+          [Symbol.dispose]() {
+            disposalOrder.push("first");
+          },
+        }),
+        second: async () => ({
+          async [Symbol.asyncDispose]() {
+            disposalOrder.push("second");
+          },
+        }),
+      })
+      .build({});
+
+    await container.get("second");
+    await container.dispose();
+
+    expect(disposalOrder).toEqual(["second", "first"]);
+  });
+
+  it("does not create or dispose unresolved resources", async () => {
+    type Values = {
+      used: Disposable;
+      unused: Disposable;
+    };
+    const graph = {
+      used: [],
+      unused: [],
+    } as const;
+    const disposeUsed = vi.fn();
+    const disposeUnused = vi.fn();
+    const createUnused = vi.fn(() => ({ [Symbol.dispose]: disposeUnused }));
+    const container = defineContainer<Values>()
+      .graph(graph)
+      .factories({
+        used: () => ({ [Symbol.dispose]: disposeUsed }),
+        unused: createUnused,
+      })
+      .build({});
+
+    await container.get("used");
+    await container.dispose();
+
+    expect(disposeUsed).toHaveBeenCalledOnce();
+    expect(createUnused).not.toHaveBeenCalled();
+    expect(disposeUnused).not.toHaveBeenCalled();
+  });
+
+  it("borrows build values and overrides even when they are disposable", async () => {
+    type Values = {
+      built: Disposable;
+      overridden: Disposable;
+      owned: Disposable;
+    };
+    const graph = {
+      built: [],
+      overridden: [],
+      owned: ["built", "overridden"],
+    } as const;
+    const disposeBuilt = vi.fn();
+    const disposeOverride = vi.fn();
+    const disposeOwned = vi.fn();
+    const container = defineContainer<Values>()
+      .graph(graph)
+      .factories({
+        owned: () => ({ [Symbol.dispose]: disposeOwned }),
+      })
+      .override({ overridden: { [Symbol.dispose]: disposeOverride } })
+      .build({
+        built: { [Symbol.dispose]: disposeBuilt },
+        overridden: { [Symbol.dispose]: vi.fn() },
+      });
+
+    await container.get("owned");
+    await container.dispose();
+
+    expect(disposeOwned).toHaveBeenCalledOnce();
+    expect(disposeBuilt).not.toHaveBeenCalled();
+    expect(disposeOverride).not.toHaveBeenCalled();
+  });
+
+  it("disposes aliases once without taking ownership of borrowed values", async () => {
+    type Values = {
+      borrowed: Disposable;
+      borrowedAlias: Disposable;
+      owned: Disposable;
+      ownedAlias: Disposable;
+    };
+    const graph = {
+      borrowed: [],
+      borrowedAlias: ["borrowed"],
+      owned: [],
+      ownedAlias: ["owned"],
+    } as const;
+    const disposeBorrowed = vi.fn();
+    const disposeOwned = vi.fn();
+    const container = defineContainer<Values>()
+      .graph(graph)
+      .factories({
+        borrowedAlias: alias("borrowed"),
+        owned: () => ({ [Symbol.dispose]: disposeOwned }),
+        ownedAlias: alias("owned"),
+      })
+      .build({ borrowed: { [Symbol.dispose]: disposeBorrowed } });
+
+    await container.get("borrowedAlias");
+    await container.get("ownedAlias");
+    await container.dispose();
+
+    expect(disposeBorrowed).not.toHaveBeenCalled();
+    expect(disposeOwned).toHaveBeenCalledOnce();
+  });
+
+  it("returns one disposal promise and cleans up only once", async () => {
+    type Values = { resource: AsyncDisposable };
+    const graph = { resource: [] } as const;
+    const disposeResource = vi.fn(async () => undefined);
+    const container = defineContainer<Values>()
+      .graph(graph)
+      .factories({
+        resource: () => ({ [Symbol.asyncDispose]: disposeResource }),
+      })
+      .build({});
+    await container.get("resource");
+
+    const first = container.dispose();
+    const second = container.dispose();
+
+    expect(first).toBe(second);
+    await Promise.all([first, second]);
+    expect(disposeResource).toHaveBeenCalledOnce();
+  });
+
+  it("waits for active resolutions and rejects new resolutions during disposal", async () => {
+    type Values = { resource: AsyncDisposable };
+    const graph = { resource: [] } as const;
+    let release: () => void = () => undefined;
+    const blocked = new Promise<void>((resolveBlocked) => {
+      release = resolveBlocked;
+    });
+    const disposeResource = vi.fn(async () => undefined);
+    const container = defineContainer<Values>()
+      .graph(graph)
+      .factories({
+        resource: async () => {
+          await blocked;
+          return { [Symbol.asyncDispose]: disposeResource };
+        },
+      })
+      .build({});
+
+    const resource = container.get("resource");
+    const disposal = container.dispose();
+    await expect(container.get("resource")).rejects.toThrow("Container is disposed");
+    expect(disposeResource).not.toHaveBeenCalled();
+
+    release();
+    await resource;
+    await disposal;
+
+    expect(disposeResource).toHaveBeenCalledOnce();
+  });
+
+  it("continues cleanup and reports all disposal errors", async () => {
+    type Values = {
+      first: Disposable;
+      second: Disposable;
+    };
+    const graph = {
+      first: [],
+      second: ["first"],
+    } as const;
+    const disposalOrder: string[] = [];
+    const firstError = new Error("first cleanup failed");
+    const secondError = new Error("second cleanup failed");
+    const container = defineContainer<Values>()
+      .graph(graph)
+      .factories({
+        first: () => ({
+          [Symbol.dispose]() {
+            disposalOrder.push("first");
+            throw firstError;
+          },
+        }),
+        second: () => ({
+          [Symbol.dispose]() {
+            disposalOrder.push("second");
+            throw secondError;
+          },
+        }),
+      })
+      .build({});
+    await container.get("second");
+
+    const error = await container.dispose().catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(AggregateError);
+    expect((error as AggregateError).errors).toEqual([secondError, firstError]);
+    expect(disposalOrder).toEqual(["second", "first"]);
+  });
+
+  it("supports await using", async () => {
+    type Values = { resource: Disposable };
+    const graph = { resource: [] } as const;
+    const disposeResource = vi.fn();
+
+    async function useContainer() {
+      await using container = defineContainer<Values>()
+        .graph(graph)
+        .factories({
+          resource: () => ({ [Symbol.dispose]: disposeResource }),
+        })
+        .build({});
+
+      await container.get("resource");
+    }
+
+    await useContainer();
+
+    expect(disposeResource).toHaveBeenCalledOnce();
+  });
 });
 
 describe("resolution", () => {

@@ -15,6 +15,7 @@ export async function get<T extends UnknownObject, K extends keyof T>(
   factories: Partial<Record<keyof T, UnknownFactory<T>>>,
   key: K,
   pending?: Map<PropertyKey, Promise<unknown>>,
+  onFactoryResult?: (value: unknown) => void,
 ): Promise<T[K]> {
   if (Object.hasOwn(resolved, key)) {
     return resolved[key] as T[K];
@@ -77,11 +78,14 @@ export async function get<T extends UnknownObject, K extends keyof T>(
       pendingMap ??= new Map();
       pendingMap.set(dependencyKey, pendingResult);
       try {
-        resolved[dependencyKey as keyof T] = (await pendingResult) as T[keyof T];
+        const value = await pendingResult;
+        onFactoryResult?.(value);
+        resolved[dependencyKey as keyof T] = value as T[keyof T];
       } finally {
         pendingMap.delete(dependencyKey);
       }
     } else {
+      onFactoryResult?.(factoryResult);
       resolved[dependencyKey as keyof T] = factoryResult as T[keyof T];
     }
   }
