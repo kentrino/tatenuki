@@ -10,7 +10,7 @@ export default defineConfig({
     "*": "vp check --fix",
   },
   fmt: {
-    ignorePatterns: ["docs/**"],
+    ignorePatterns: ["docs/**", "**/CHANGELOG.md"],
   },
   lint: {
     ignorePatterns: ["docs/**"],

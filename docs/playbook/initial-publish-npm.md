@@ -28,10 +28,12 @@ This procedure ends with the first `npm publish`.
 
 Do these tasks after this procedure:
 
-- GitHub Actions and release-please
-- `npm publish --provenance` and the `repository` field in `package.json`
-- A CHANGELOG that a tool writes
-- Updates of dependencies with Renovate
+- Push this repository to GitHub
+- Set `RELEASE_BOT_APP_ID` (variable) and `RELEASE_BOT_PRIVATE_KEY` (secret)
+- On npm, add this GitHub repository and `.github/workflows/release.yml` as a trusted publisher for each public package
+- Add the `repository` field to each published `package.json`
+
+GitHub Actions, release-please, provenance on publish, CHANGELOG generation, and Renovate are in the repository.
 
 # Published package
 
