@@ -324,6 +324,22 @@ describe("resolution", () => {
     ).rejects.toThrow("Circular dependency");
   });
 
+  it("allows a pre-resolved value to break a dependency cycle", async () => {
+    type Values = { first: string; second: string };
+    const graph = {
+      first: ["second"],
+      second: ["first"],
+    } as const;
+
+    await expect(
+      get<Values, "second">(
+        graph,
+        { first: "provided" },
+        { second: ({ first }) => `${first}-second` },
+        "second",
+      ),
+    ).resolves.toBe("provided-second");
+  });
 
   it("caches resolved undefined values", async () => {
     type Values = { optional: undefined };

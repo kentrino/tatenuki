@@ -25,6 +25,10 @@ export async function get<T extends UnknownObject, K extends keyof T>(
   let pendingMap = pending;
 
   const visit = (dependencyKey: PropertyKey): boolean => {
+    if (Object.hasOwn(resolved, dependencyKey)) {
+      return false;
+    }
+
     visiting.add(dependencyKey);
 
     const dependencies = graph[dependencyKey];
