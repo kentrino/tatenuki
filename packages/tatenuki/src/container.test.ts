@@ -324,6 +324,7 @@ describe("resolution", () => {
     ).rejects.toThrow("Circular dependency");
   });
 
+
   it("caches resolved undefined values", async () => {
     type Values = { optional: undefined };
     const factory = vi.fn(() => undefined);
@@ -461,6 +462,33 @@ describe("resolution", () => {
     );
 
     expect(result).toEqual({ optional: undefined, initialized: true });
+  });
+
+  it("does not count values outside the graph as resolved graph entries", async () => {
+    type Values = {
+      seed: string;
+      service: string;
+      metadata: boolean;
+    };
+    const graph = {
+      seed: [],
+      service: ["seed"],
+    } as const;
+    const createService = vi.fn(({ seed }: Pick<Values, "seed">) => `${seed}-service`);
+    const values = { seed: "ready", metadata: true };
+
+    const result = await resolve<Values, typeof graph, "service", "seed">(
+      graph,
+      { service: createService },
+      values,
+    );
+
+    expect(result).toEqual({
+      seed: "ready",
+      service: "ready-service",
+      metadata: true,
+    });
+    expect(createService).toHaveBeenCalledOnce();
   });
 
   it("reports cycles during eager resolution", async () => {
