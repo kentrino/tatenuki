@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "bench": "vitest bench --run",
+    "bench:json": "node src/cli/index.ts",
     "check": "vp check"
   },
   "dependencies": {
@@ -11,6 +12,7 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "citty": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:",
