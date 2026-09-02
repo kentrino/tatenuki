@@ -1,0 +1,19 @@
+{
+  "name": "@tatenuki/benchmark-container-comparison",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bench": "vitest bench --run",
+    "check": "vp check"
+  },
+  "dependencies": {
+    "@inferdi/inferdi": "6.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:",
+    "vitest": "4.1.10"
+  }
+}
