@@ -1,4 +1,4 @@
-export { Container, defineContainer, inject } from "./container.ts";
+export { alias, Container, defineContainer, inject } from "./container.ts";
 export { get } from "./get.ts";
 export { hasCycle } from "./hasCycle.ts";
 export { resolve } from "./resolve.ts";

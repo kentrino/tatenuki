@@ -140,3 +140,7 @@ export function inject(target: unknown): unknown {
     return (...arguments_: unknown[]) => fn(dependencies, ...arguments_);
   };
 }
+
+export function alias<K extends PropertyKey>(key: K) {
+  return <T extends Record<K, unknown>>(dependencies: T): T[K] => dependencies[key];
+}
