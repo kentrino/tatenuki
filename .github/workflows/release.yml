@@ -45,8 +45,8 @@ jobs:
         with:
           registry-url: https://registry.npmjs.org
 
-      - run: pnpm ready
+      - run: vp run ready
 
       - name: Publish ${{ matrix.path }}
         working-directory: ${{ matrix.path }}
-        run: pnpm publish --access public --no-git-checks --provenance
+        run: vp pm publish --access public --no-git-checks --provenance
