@@ -9,7 +9,7 @@ npm install tatenuki
 ```
 
 ```ts
-import { defineContainer, inject, type DependencyGraph, type ValueOf } from "tatenuki";
+import { alias, defineContainer, inject, type DependencyGraph, type ValueOf } from "tatenuki";
 ```
 
 ## Define a container
@@ -108,6 +108,32 @@ The resulting function preserves all arguments after the dependency object and
 the original return type, including promises. This keeps dependencies explicit
 in the function definition without requiring callers to pass them repeatedly.
 
+## Alias an existing dependency
+
+Use `alias()` to expose an already resolved dependency under another key without
+creating a new instance:
+
+```ts
+type Definition = {
+  apiClient: ApiClient;
+  primaryApiClient: ApiClient;
+};
+
+const dependencies = {
+  apiClient: [],
+  primaryApiClient: ["apiClient"],
+} as const satisfies DependencyGraph<Definition>;
+
+const container = defineContainer<Definition>()
+  .graph(dependencies)
+  .factories({ primaryApiClient: alias("apiClient") })
+  .build({ apiClient });
+```
+
+The alias key must list its source key in the dependency graph. This expresses
+the dependency and ensures the source is resolved before the alias factory runs.
+Both keys resolve to the same value.
+
 ## Override values in tests
 
 Call `override()` before `build()` or `resolve()` to replace selected
@@ -173,6 +199,7 @@ is missing or when a circular dependency is encountered.
 - `inject(SomeClass)` supports classes whose constructor takes one dependency
   object. `inject(someFunction)` binds the dependency object passed as the
   function's first argument.
+- `alias("someKey")` reuses the resolved value for `someKey` under another key.
 - Register classes with other constructor shapes and functions that do not take
   dependencies first using a custom factory.
 - Registering the same factory key again replaces the earlier factory.

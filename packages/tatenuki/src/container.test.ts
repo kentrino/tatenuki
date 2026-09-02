@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it, vi } from "vite-plus/test";
-import { Container, defineContainer, inject } from "./container.ts";
+import { alias, Container, defineContainer, inject } from "./container.ts";
 import { get } from "./get.ts";
 import { resolve } from "./resolve.ts";
 import type { DependencyGraph } from "./type.ts";
@@ -69,6 +69,49 @@ describe("Container", () => {
 
     expectTypeOf(service).toEqualTypeOf<Service>();
     expect(service.apiClient.baseUrl).toBe("https://example.com");
+  });
+
+  it("aliases an existing dependency without creating a new instance", async () => {
+    type AliasDefinition = {
+      apiClient: ApiClient;
+      primaryApiClient: ApiClient;
+    };
+    const aliasDependencies = {
+      apiClient: [],
+      primaryApiClient: ["apiClient"],
+    } as const satisfies DependencyGraph<AliasDefinition>;
+    const apiClient = new ApiClient({ baseUrl: "https://example.com" });
+    const container = defineContainer<AliasDefinition>()
+      .graph(aliasDependencies)
+      .factories({ primaryApiClient: alias("apiClient") })
+      .build({ apiClient });
+
+    const primaryApiClient = await container.get("primaryApiClient");
+
+    expectTypeOf(primaryApiClient).toEqualTypeOf<ApiClient>();
+    expect(primaryApiClient).toBe(apiClient);
+  });
+
+  it("aliases a dependency as a compatible supertype", async () => {
+    type SuperApiClient = Pick<ApiClient, "baseUrl">;
+    type AliasDefinition = {
+      apiClient: ApiClient;
+      primaryApiClient: SuperApiClient;
+    };
+    const aliasDependencies = {
+      apiClient: [],
+      primaryApiClient: ["apiClient"],
+    } as const satisfies DependencyGraph<AliasDefinition>;
+    const apiClient = new ApiClient({ baseUrl: "https://example.com" });
+    const container = defineContainer<AliasDefinition>()
+      .graph(aliasDependencies)
+      .factories({ primaryApiClient: alias("apiClient") })
+      .build({ apiClient });
+
+    const primaryApiClient = await container.get("primaryApiClient");
+
+    expectTypeOf(primaryApiClient).toEqualTypeOf<SuperApiClient>();
+    expect(primaryApiClient).toBe(apiClient);
   });
 
   it("resolves the entire graph through the builder API", async () => {
