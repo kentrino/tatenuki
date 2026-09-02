@@ -234,6 +234,9 @@ importers:
 
   examples/hono:
     dependencies:
+      '@tatenuki/hono':
+        specifier: workspace:*
+        version: link:../../packages/hono
       hono:
         specifier: 'catalog:'
         version: 4.13.5
@@ -244,6 +247,30 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 26.4.0
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vite:
+        specifier: npm:@voidzero-dev/vite-plus-core@0.2.8
+        version: '@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.4.0)(typescript@7.0.2)(unrun@0.2.39)'
+      vite-plus:
+        specifier: 'catalog:'
+        version: 0.2.8(@types/node@26.4.0)(@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.4.0)(typescript@7.0.2)(unrun@0.2.39))(typescript@7.0.2)(unrun@0.2.39)
+
+  packages/hono:
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.4.0
+      hono:
+        specifier: 'catalog:'
+        version: 4.13.5
+      tatenuki:
+        specifier: workspace:*
+        version: link:../tatenuki
+      tsdown:
+        specifier: ^0.22.14
+        version: 0.22.14(typescript@7.0.2)(unrun@0.2.39)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
