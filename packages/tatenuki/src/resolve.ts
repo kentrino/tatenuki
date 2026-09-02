@@ -11,8 +11,13 @@ export async function resolve<
   values: PartialValues<T, ValueKeys>,
 ): Promise<T> {
   const result = values as T;
-  const resolved = new Set<keyof T>(Reflect.ownKeys(values) as (keyof T)[]);
   const keys = Reflect.ownKeys(dependencies) as (keyof D)[];
+  const resolved = new Set<keyof T>();
+  for (const key of keys) {
+    if (Object.hasOwn(values, key)) {
+      resolved.add(key as keyof T);
+    }
+  }
   if (resolved.size >= keys.length) {
     return result;
   }
