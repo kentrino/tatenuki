@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "description": "A small, typed dependency-injection container for composition roots.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kentrino/tatenuki.git",
+    "directory": "packages/tatenuki"
+  },
   "files": [
     "dist"
   ],
