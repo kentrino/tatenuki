@@ -9,21 +9,13 @@ function isThenable(value: unknown): value is PromiseLike<unknown> {
   );
 }
 
-export async function get<T extends UnknownObject, K extends keyof T>(
+export function createGetPlan<K extends PropertyKey>(
   graph: Record<PropertyKey, readonly PropertyKey[]>,
-  resolved: Partial<T>,
-  factories: Partial<Record<keyof T, UnknownFactory<T>>>,
+  resolved: UnknownObject,
   key: K,
-  pending?: Map<PropertyKey, Promise<unknown>>,
-  onFactoryResult?: (value: unknown) => void,
-): Promise<T[K]> {
-  if (Object.hasOwn(resolved, key)) {
-    return resolved[key] as T[K];
-  }
-
+): readonly PropertyKey[] {
   const visiting = new Set<PropertyKey>();
   const visited = new Set<PropertyKey>();
-  let pendingMap = pending;
 
   const visit = (dependencyKey: PropertyKey): boolean => {
     if (Object.hasOwn(resolved, dependencyKey)) {
@@ -56,7 +48,20 @@ export async function get<T extends UnknownObject, K extends keyof T>(
     throw new Error("Circular dependency");
   }
 
-  for (const dependencyKey of visited) {
+  return [...visited];
+}
+
+async function getFromPlan<T extends UnknownObject, K extends keyof T>(
+  resolved: Partial<T>,
+  factories: Partial<Record<keyof T, UnknownFactory<T>>>,
+  key: K,
+  plan: readonly PropertyKey[],
+  pending?: Map<PropertyKey, Promise<unknown>>,
+  onFactoryResult?: (value: unknown) => void,
+): Promise<T[K]> {
+  let pendingMap = pending;
+
+  for (const dependencyKey of plan) {
     if (Object.hasOwn(resolved, dependencyKey)) {
       continue;
     }
@@ -91,4 +96,35 @@ export async function get<T extends UnknownObject, K extends keyof T>(
   }
 
   return resolved[key] as T[K];
+}
+
+export async function get<T extends UnknownObject, K extends keyof T>(
+  graph: Record<PropertyKey, readonly PropertyKey[]>,
+  resolved: Partial<T>,
+  factories: Partial<Record<keyof T, UnknownFactory<T>>>,
+  key: K,
+  pending?: Map<PropertyKey, Promise<unknown>>,
+  onFactoryResult?: (value: unknown) => void,
+): Promise<T[K]> {
+  if (Object.hasOwn(resolved, key)) {
+    return resolved[key] as T[K];
+  }
+
+  const plan = createGetPlan(graph, resolved, key);
+  return getFromPlan(resolved, factories, key, plan, pending, onFactoryResult);
+}
+
+export async function getWithPlan<T extends UnknownObject, K extends keyof T>(
+  resolved: Partial<T>,
+  factories: Partial<Record<keyof T, UnknownFactory<T>>>,
+  key: K,
+  plan: readonly PropertyKey[],
+  pending?: Map<PropertyKey, Promise<unknown>>,
+  onFactoryResult?: (value: unknown) => void,
+): Promise<T[K]> {
+  if (Object.hasOwn(resolved, key)) {
+    return resolved[key] as T[K];
+  }
+
+  return getFromPlan(resolved, factories, key, plan, pending, onFactoryResult);
 }

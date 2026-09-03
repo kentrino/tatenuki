@@ -186,6 +186,27 @@ describe("Container", () => {
     expect(trackInflight).not.toHaveBeenCalled();
   });
 
+  it("reuses first-resolution plans across containers from the same builder", async () => {
+    const builder = defineContainer<Definition>()
+      .graph(dependencies)
+      .factories({
+        apiClient: inject(ApiClient),
+        service: inject(Service),
+      });
+    const planCache = Reflect.get(builder, "planCache") as Map<
+      PropertyKey,
+      { plan: readonly PropertyKey[] }[]
+    >;
+
+    await builder.build({ baseUrl: "first" }).get("service");
+    const firstPlan = planCache.get("service")?.[0]?.plan;
+    await builder.build({ baseUrl: "second" }).get("service");
+
+    expect(firstPlan).toEqual(["apiClient", "service"]);
+    expect(planCache.get("service")).toHaveLength(1);
+    expect(planCache.get("service")?.[0]?.plan).toBe(firstPlan);
+  });
+
   it("uses the latest factory when a key is registered again", async () => {
     const result = await new Container<Definition, typeof dependencies>(dependencies)
       .factory({
