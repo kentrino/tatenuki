@@ -1,14 +1,5 @@
 type UnknownObject = Record<PropertyKey, unknown>;
 type UnknownFactory<T extends UnknownObject> = (dependencies: T) => unknown;
-type PendingMap = Map<PropertyKey, Promise<unknown>>;
-
-export type PendingHost = {
-  pending?: PendingMap;
-};
-
-function getPendingMap(pending: PendingMap | PendingHost | undefined): PendingMap | undefined {
-  return pending instanceof Map ? pending : pending?.pending;
-}
 
 function isThenable(value: unknown): value is PromiseLike<unknown> {
   return (
@@ -65,15 +56,17 @@ async function getFromPlan<T extends UnknownObject, K extends keyof T>(
   factories: Partial<Record<keyof T, UnknownFactory<T>>>,
   key: K,
   plan: readonly PropertyKey[],
-  pending?: PendingMap | PendingHost,
+  pending?: Map<PropertyKey, Promise<unknown>>,
   onFactoryResult?: (value: unknown) => void,
 ): Promise<T[K]> {
+  let pendingMap = pending;
+
   for (const dependencyKey of plan) {
     if (Object.hasOwn(resolved, dependencyKey)) {
       continue;
     }
 
-    const pendingValue = getPendingMap(pending)?.get(dependencyKey);
+    const pendingValue = pendingMap?.get(dependencyKey);
     if (pendingValue) {
       resolved[dependencyKey as keyof T] = (await pendingValue) as T[keyof T];
       continue;
@@ -87,13 +80,7 @@ async function getFromPlan<T extends UnknownObject, K extends keyof T>(
     const factoryResult = factory(resolved as T);
     if (isThenable(factoryResult)) {
       const pendingResult = Promise.resolve(factoryResult);
-      let pendingMap = getPendingMap(pending);
-      if (!pendingMap) {
-        pendingMap = new Map();
-        if (pending && !(pending instanceof Map)) {
-          pending.pending = pendingMap;
-        }
-      }
+      pendingMap ??= new Map();
       pendingMap.set(dependencyKey, pendingResult);
       try {
         const value = await pendingResult;
@@ -101,9 +88,6 @@ async function getFromPlan<T extends UnknownObject, K extends keyof T>(
         resolved[dependencyKey as keyof T] = value as T[keyof T];
       } finally {
         pendingMap.delete(dependencyKey);
-        if (pendingMap.size === 0 && pending && !(pending instanceof Map)) {
-          pending.pending = undefined;
-        }
       }
     } else {
       onFactoryResult?.(factoryResult);
@@ -119,7 +103,7 @@ export async function get<T extends UnknownObject, K extends keyof T>(
   resolved: Partial<T>,
   factories: Partial<Record<keyof T, UnknownFactory<T>>>,
   key: K,
-  pending?: PendingMap,
+  pending?: Map<PropertyKey, Promise<unknown>>,
   onFactoryResult?: (value: unknown) => void,
 ): Promise<T[K]> {
   if (Object.hasOwn(resolved, key)) {
@@ -135,7 +119,7 @@ export async function getWithPlan<T extends UnknownObject, K extends keyof T>(
   factories: Partial<Record<keyof T, UnknownFactory<T>>>,
   key: K,
   plan: readonly PropertyKey[],
-  pending?: PendingMap | PendingHost,
+  pending?: Map<PropertyKey, Promise<unknown>>,
   onFactoryResult?: (value: unknown) => void,
 ): Promise<T[K]> {
   if (Object.hasOwn(resolved, key)) {

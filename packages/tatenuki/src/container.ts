@@ -1,4 +1,4 @@
-import { createGetPlan, getWithPlan, type PendingHost } from "./get.ts";
+import { createGetPlan, getWithPlan } from "./get.ts";
 import { resolve } from "./resolve.ts";
 import type { DependenciesOf, PartialFactories, PartialValues } from "./type.ts";
 
@@ -85,7 +85,7 @@ class FullyDefinedContainer<
 > {
   private readonly dependencies: D;
   private readonly registeredFactories: PartialFactories<T, D, FactoryKeys>;
-  private pending: Map<PropertyKey, Promise<unknown>> | undefined;
+  private readonly pending = new Map<PropertyKey, Promise<unknown>>();
   private known: unknown[] | Set<unknown>;
   private owned: DisposableValue[] | undefined;
   private inflight: Promise<unknown> | Set<Promise<unknown>> | undefined;
@@ -124,7 +124,7 @@ class FullyDefinedContainer<
       this.registeredFactories as unknown as Partial<Record<keyof T, (dependencies: T) => unknown>>,
       key,
       this.getPlan(key),
-      this.pendingHost(),
+      this.pending,
       (value) => this.onFactoryResult(value),
     );
     this.trackInflight(promise);
@@ -150,11 +150,6 @@ class FullyDefinedContainer<
 
   [Symbol.asyncDispose](): Promise<void> {
     return this.dispose();
-  }
-
-  private pendingHost(): PendingHost {
-    void this.pending;
-    return this as unknown as PendingHost;
   }
 
   private getPlan(key: PropertyKey): readonly PropertyKey[] {
