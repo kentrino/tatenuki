@@ -1,30 +1,32 @@
 import { Hono } from "hono";
 import { bench, describe } from "vite-plus/test";
 import { createApp } from "./app.ts";
-import { createRequestScope, databasePool } from "./container.ts";
+import { createRequestScope, databasePool, Logger } from "./container.ts";
 
 const request = { requestId: "benchmark-request", userId: "benchmark-user" };
+const logger = new Logger(() => undefined);
 const bareApp = new Hono();
 bareApp.get("/users/:id", (context) =>
   context.json({
     id: context.req.param("id"),
-    requestedBy: context.req.header("x-user-id"),
-    requestId: request.requestId,
     databasePoolId: databasePool.id,
     profileServiceId: 1,
   }),
 );
 
-const scopedApp = createApp({ createRequestId: () => request.requestId });
+const scopedApp = createApp({
+  createRequestId: () => request.requestId,
+  logger,
+});
 const requestInit = { headers: { "x-user-id": request.userId } };
 
 describe("Hono request scope overhead", () => {
   bench("build a request scope from the unresolved graph", () => {
-    void createRequestScope(request);
+    void createRequestScope(request, logger);
   });
 
   bench("create scope and lazily resolve route service", async () => {
-    const scope = createRequestScope(request);
+    const scope = createRequestScope(request, logger);
     const service = await scope.get("profileService");
     void service.getProfile("42");
   });

@@ -5,6 +5,10 @@
     "moduleDetection": "force",
     "module": "esnext",
     "moduleResolution": "bundler",
+    "paths": {
+      "@tatenuki/hono": ["../../packages/hono/src/index.ts"],
+      "tatenuki": ["../../packages/tatenuki/src/index.ts"]
+    },
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "types": ["node"],
