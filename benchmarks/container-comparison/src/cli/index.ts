@@ -145,7 +145,7 @@ const main = defineCommand({
       throw new Error(`No benchmark files found in ${sourceRoot}.`);
     }
 
-    const revisionDir = resolve(repositoryRoot, outputDir, "bench", revision);
+    const revisionDir = resolve(repositoryRoot, outputDir, revision);
     await mkdir(revisionDir, { recursive: true });
 
     const reports: { slug: string; output: string }[] = [];
