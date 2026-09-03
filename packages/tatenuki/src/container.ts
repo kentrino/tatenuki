@@ -26,15 +26,22 @@ export interface ResolvedContainer<T extends Record<PropertyKey, unknown>> {
 
 const KNOWN_VALUE_ARRAY_LIMIT = 8;
 const RESOLVE_ALL_PLAN_KEY = Symbol("resolveAll");
+const dependencySnapshots = new WeakSet<object>();
 
 function snapshotDependencies<D extends Record<PropertyKey, readonly PropertyKey[]>>(
   dependencies: D,
 ): D {
+  if (dependencySnapshots.has(dependencies)) {
+    return dependencies;
+  }
+
   const snapshot = Object.create(null) as Record<PropertyKey, readonly PropertyKey[]>;
   for (const key of Reflect.ownKeys(dependencies)) {
     snapshot[key] = Object.freeze([...dependencies[key]]);
   }
-  return Object.freeze(snapshot) as D;
+  const frozenSnapshot = Object.freeze(snapshot) as D;
+  dependencySnapshots.add(frozenSnapshot);
+  return frozenSnapshot;
 }
 
 function hasSameKeys(left: readonly PropertyKey[], right: readonly PropertyKey[]): boolean {

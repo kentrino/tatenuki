@@ -599,6 +599,39 @@ describe("Container", () => {
     expect(result.apiClient.baseUrl).toBe("second");
   });
 
+  it("reuses immutable dependency snapshots across builder variants", async () => {
+    type Values = {
+      seed: number;
+      derived: number;
+    };
+    const mutableDependencies = {
+      seed: [] as [],
+      derived: ["seed"] as ["seed"],
+    };
+    const root = new Container<Values, typeof mutableDependencies>(mutableDependencies);
+    const first = root.factory({
+      derived: ({ seed }) => seed + 1,
+    });
+    const overridden = first.override({ seed: 10 });
+    const snapshot = Reflect.get(root, "dependencies");
+
+    expect(Reflect.get(first, "dependencies")).toBe(snapshot);
+    expect(Reflect.get(overridden, "dependencies")).toBe(snapshot);
+
+    mutableDependencies.derived[0] = "derived" as "seed";
+    Reflect.set(mutableDependencies, "added", []);
+    const second = root.factory({
+      derived: ({ seed }) => seed + 1,
+    });
+
+    expect(Reflect.get(second, "dependencies")).toBe(snapshot);
+    expect(Reflect.ownKeys(snapshot)).toEqual(["seed", "derived"]);
+    expect(snapshot.derived).toEqual(["seed"]);
+    await expect(first.build({ seed: 1 }).get("derived")).resolves.toBe(2);
+    await expect(overridden.build({ seed: 1 }).get("derived")).resolves.toBe(11);
+    await expect(second.build({ seed: 2 }).get("derived")).resolves.toBe(3);
+  });
+
   it("overrides a dependency at runtime without changing build requirements", async () => {
     const createApiClient = vi.fn(inject(ApiClient));
     const fakeApiClient = new ApiClient({ baseUrl: "fake" });
