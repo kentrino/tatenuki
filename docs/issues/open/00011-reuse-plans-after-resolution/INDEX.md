@@ -1,6 +1,6 @@
 ---
 title: "Reuse dependency plans after initial resolution"
-author: Composer
+author: Grok 4.6
 cost: 5
 priority: P1
 source: current-implementation
@@ -16,4 +16,4 @@ Plan reuse stops after the first factory result. A container that lazily request
 
 # Hypothesis
 
-Cached plans can remain valid because execution already skips keys resolved since the plan was created. Add a multi-root lazy-resolution benchmark and tests covering shared dependencies, overrides, cycles hidden by initial values, and failed factories.
+Plans computed against a container's initial resolved keys stay valid later because execution already skips keys resolved since the plan was created. Cache only plans built from those initial keys, not from the current resolved set. Add a multi-root lazy-resolution benchmark and tests for shared dependencies, overrides, cycles hidden by initial values, and a later `get()` after a failed factory.

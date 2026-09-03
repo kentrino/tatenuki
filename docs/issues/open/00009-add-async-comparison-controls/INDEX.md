@@ -1,6 +1,6 @@
 ---
-title: "Add asynchronous comparison controls"
-author: Composer
+title: "Add async-wrapped comparison controls"
+author: GPT-5.6
 cost: 2
 priority: P1
 source: container-comparison-profile
@@ -8,12 +8,12 @@ source: container-comparison-profile
 
 # Abstract
 
-Add InferDI asynchronous API controls to the container-comparison benchmarks. Keep the existing synchronous controls so reports show both real throughput differences and async-contract overhead.
+Add async-wrapped InferDI controls beside every container-comparison sample that awaits `tatenuki.get()`. Keep the existing synchronous controls so reports show both throughput differences and async-boundary overhead.
 
 # Problem
 
-The current cached and partial-resolution comparisons place tatenuki's Promise API beside InferDI's synchronous API. This is useful for end-to-end throughput but cannot isolate tatenuki implementation cost from the fixed cost of asynchronous access.
+The cached-get, build-and-first-get, and partial-resolution comparisons place tatenuki's Promise API beside InferDI's synchronous API. This cannot isolate tatenuki implementation cost from the fixed cost of an asynchronous call and `await`.
 
 # Acceptance
 
-Report synchronous and asynchronous InferDI controls for relevant scenarios, verify equivalent resolved values, and document which comparisons are contract-matched.
+For InferDI default and fast modes, add samples that perform the same setup and `get()` work as their synchronous counterparts, adding only an async helper and `await`. Preserve what runs inside each timed sample, verify equivalent values and factory counts, and label and document the async-wrapped comparisons as contract-matched.
