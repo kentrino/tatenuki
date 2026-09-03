@@ -1,6 +1,6 @@
 ---
 title: "Defer initial value identity tracking"
-author: Composer
+author: GPT-5.6
 cost: 5
 priority: P2
 source: get-performance-suspects
@@ -8,12 +8,12 @@ source: get-performance-suspects
 
 # Abstract
 
-Avoid eagerly collecting every initial value solely for ownership identity checks. Keep duplicate-disposal prevention, override behavior, plan selection, and public API behavior unchanged.
+Defer ownership identity tracking of effective initial values until the first factory result. Keep duplicate-disposal prevention, override behavior, plan selection, and public API behavior unchanged.
 
 # Problem
 
-Each container builds a resolved object, enumerates all of its keys, and maps those keys back to values before any factory result exists. This adds context-creation cost when request inputs or overrides are numerous.
+Each built container enumerates resolved keys for plan caching, then immediately reads every corresponding value to initialize ownership identity tracking before any factory result exists. This adds construction cost when build values or overrides are numerous.
 
 # Hypothesis
 
-Deferring value identity tracking until a factory produces an owned candidate will improve fresh-container construction. Add a benchmark with many initial values and preserve tests where initial values and factory results share object identity.
+Initializing identity tracking from the effective resolved values only when the first factory result is classified will improve fresh-container construction. Add a many-initial-values benchmark and tests proving that results identical to an effective initial value remain borrowed and duplicate owned results are disposed once.

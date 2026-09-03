@@ -1,6 +1,6 @@
 ---
 title: "Resolve all dependencies without per-key get overhead"
-author: Composer
+author: Grok 4.6
 cost: 8
 priority: P2
 source: current-implementation
@@ -8,7 +8,7 @@ source: current-implementation
 
 # Abstract
 
-Resolve the full graph through one bulk execution path instead of awaiting public `get()` once per key. Keep factory ordering constraints, async factories, ownership, disposal, error behavior, and the `resolveAll()` API unchanged.
+Resolve the full graph through one bulk execution path instead of awaiting public `get()` once per key. Keep the `resolveAll()` API, ownership, disposal, pending isolation, and error strings of the container `get()` path. Do not call `Container.resolve()`, and do not start independent factories in parallel.
 
 # Problem
 
@@ -16,4 +16,4 @@ Resolve the full graph through one bulk execution path instead of awaiting publi
 
 # Hypothesis
 
-A single full-graph plan or equivalent bulk resolver will reduce eager-resolution time, especially for large graphs. Add `resolveAll()` benchmarks for synchronous and mixed async DAGs and compare both throughput and allocations.
+A single full-graph plan or equivalent bulk resolver will reduce eager-resolution time, especially for large graphs. Declared dependencies must still resolve before dependents. Add `resolveAll()` benchmarks for synchronous and mixed async DAGs and compare both throughput and allocations.
