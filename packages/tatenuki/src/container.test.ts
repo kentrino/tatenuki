@@ -212,6 +212,65 @@ describe("Container", () => {
     expect(Reflect.get(container, "owned")).toBeUndefined();
   });
 
+  it("does not allocate pending factory tracking for synchronous resolution", async () => {
+    const container = new Container<Definition, typeof dependencies>(dependencies)
+      .factory({
+        apiClient: inject(ApiClient),
+        service: inject(Service),
+      })
+      .value({ baseUrl: "https://example.com" });
+
+    expect(Reflect.get(container, "pending")).toBeUndefined();
+
+    await container.get("service");
+
+    expect(Reflect.get(container, "pending")).toBeUndefined();
+  });
+
+  it("allocates pending factory tracking only while an asynchronous factory is in progress", async () => {
+    type Values = {
+      shared: string;
+      left: string;
+      right: string;
+    };
+    const graph = {
+      shared: [],
+      left: ["shared"],
+      right: ["shared"],
+    } as const;
+    let release: () => void = () => undefined;
+    const blocked = new Promise<void>((resolveBlocked) => {
+      release = resolveBlocked;
+    });
+    const createShared = vi.fn(async () => {
+      await blocked;
+      return "shared";
+    });
+    const container = defineContainer<Values>()
+      .graph(graph)
+      .factories({
+        shared: createShared,
+        left: ({ shared }) => `${shared}-left`,
+        right: ({ shared }) => `${shared}-right`,
+      })
+      .build({});
+
+    expect(Reflect.get(container, "pending")).toBeUndefined();
+
+    const left = container.get("left");
+    expect(Reflect.get(container, "pending")).toBeInstanceOf(Map);
+    expect(Reflect.get(container, "pending")).toHaveProperty("size", 1);
+
+    const right = container.get("right");
+    expect(Reflect.get(container, "pending")).toBeInstanceOf(Map);
+    expect(Reflect.get(container, "pending")).toHaveProperty("size", 1);
+
+    release();
+    await expect(Promise.all([left, right])).resolves.toEqual(["shared-left", "shared-right"]);
+    expect(createShared).toHaveBeenCalledOnce();
+    expect(Reflect.get(container, "pending")).toBeUndefined();
+  });
+
   it("does not start in-flight tracking for a cached value", async () => {
     const container = new Container<Definition, typeof dependencies>(dependencies)
       .factory({
