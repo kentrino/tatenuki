@@ -295,6 +295,148 @@ describe("Container", () => {
     expect(planCache.get("service")?.[0]?.plan).toBe(firstPlan);
   });
 
+  it("reuses later-root plans computed from initial resolved keys", async () => {
+    type Values = {
+      shared: string;
+      left: string;
+      right: string;
+    };
+    const graph = {
+      shared: [],
+      left: ["shared"],
+      right: ["shared"],
+    } as const;
+    let sharedCount = 0;
+    const builder = defineContainer<Values>()
+      .graph(graph)
+      .factories({
+        shared: () => {
+          sharedCount += 1;
+          return "shared";
+        },
+        left: ({ shared }) => `${shared}-left`,
+        right: ({ shared }) => `${shared}-right`,
+      });
+    const planCache = Reflect.get(builder, "planCache") as Map<
+      PropertyKey,
+      { plan: readonly PropertyKey[] }[]
+    >;
+
+    const first = builder.build({});
+    await expect(first.get("left")).resolves.toBe("shared-left");
+    await expect(first.get("right")).resolves.toBe("shared-right");
+    const rightPlan = planCache.get("right")?.[0]?.plan;
+
+    const second = builder.build({});
+    await expect(second.get("right")).resolves.toBe("shared-right");
+
+    expect(sharedCount).toBe(2);
+    expect(rightPlan).toEqual(["shared", "right"]);
+    expect(planCache.get("right")).toHaveLength(1);
+    expect(planCache.get("right")?.[0]?.plan).toBe(rightPlan);
+  });
+
+  it("keeps override keys in later-root plans", async () => {
+    type Values = {
+      shared: string;
+      left: string;
+      right: string;
+    };
+    const graph = {
+      shared: [],
+      left: ["shared"],
+      right: ["shared"],
+    } as const;
+    const createShared = vi.fn(() => "shared");
+    const builder = defineContainer<Values>()
+      .graph(graph)
+      .factories({
+        shared: createShared,
+        left: ({ shared }) => `${shared}-left`,
+        right: ({ shared }) => `${shared}-right`,
+      })
+      .override({ shared: "override" });
+
+    const first = builder.build({});
+    await expect(first.get("left")).resolves.toBe("override-left");
+    await expect(first.get("right")).resolves.toBe("override-right");
+
+    const second = builder.build({});
+    await expect(second.get("right")).resolves.toBe("override-right");
+    expect(createShared).not.toHaveBeenCalled();
+  });
+
+  it("still hides cycles that initial values already break after a later factory", async () => {
+    type Values = {
+      first: string;
+      second: string;
+      third: string;
+    };
+    const graph = {
+      first: ["second"],
+      second: ["first"],
+      third: [],
+    } as const;
+    type CyclicContainer = {
+      get<K extends keyof Values>(key: K): Promise<Values[K]>;
+    };
+    const builder = (
+      defineContainer<Values>() as unknown as {
+        graph(dependencies: typeof graph): {
+          factories(factories: {
+            first: (dependencies: Values) => string;
+            second: (dependencies: Values) => string;
+            third: () => string;
+          }): {
+            build(values: Pick<Values, "first">): CyclicContainer;
+          };
+        };
+      }
+    )
+      .graph(graph)
+      .factories({
+        first: ({ second }) => second,
+        second: ({ first }) => `${first}-second`,
+        third: () => "third",
+      });
+
+    const first = builder.build({ first: "provided" });
+    await expect(first.get("third")).resolves.toBe("third");
+    await expect(first.get("second")).resolves.toBe("provided-second");
+
+    const second = builder.build({ first: "provided" });
+    await expect(second.get("second")).resolves.toBe("provided-second");
+  });
+
+  it("resolves a later key after a factory failure", async () => {
+    type Values = {
+      shared: string;
+      failing: string;
+      ok: string;
+    };
+    const graph = {
+      shared: [],
+      failing: ["shared"],
+      ok: [],
+    } as const;
+    const builder = defineContainer<Values>()
+      .graph(graph)
+      .factories({
+        shared: () => "shared",
+        failing: () => {
+          throw new Error("temporary failure");
+        },
+        ok: () => "ok",
+      });
+
+    const first = builder.build({});
+    await expect(first.get("failing")).rejects.toThrow("temporary failure");
+    await expect(first.get("ok")).resolves.toBe("ok");
+
+    const second = builder.build({});
+    await expect(second.get("ok")).resolves.toBe("ok");
+  });
+
   it("uses the latest factory when a key is registered again", async () => {
     const result = await new Container<Definition, typeof dependencies>(dependencies)
       .factory({
