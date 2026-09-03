@@ -2,6 +2,19 @@ import { get } from "./get.ts";
 import { resolve } from "./resolve.ts";
 import type { DependenciesOf, PartialFactories, PartialValues } from "./type.ts";
 
+type DisposableValue = {
+  [Symbol.asyncDispose]?: () => PromiseLike<void>;
+  [Symbol.dispose]?: () => void;
+};
+
+function isDisposable(value: unknown): value is DisposableValue {
+  return (
+    value !== null &&
+    (typeof value === "object" || typeof value === "function") &&
+    (Symbol.asyncDispose in value || Symbol.dispose in value)
+  );
+}
+
 class FullyDefinedContainer<
   T extends Record<PropertyKey, unknown>,
   D extends DependenciesOf<D, keyof T>,
@@ -11,6 +24,10 @@ class FullyDefinedContainer<
   private readonly dependencies: D;
   private readonly registeredFactories: PartialFactories<T, D, FactoryKeys>;
   private readonly pending = new Map<PropertyKey, Promise<unknown>>();
+  private readonly known: Set<unknown>;
+  private readonly owned: DisposableValue[] = [];
+  private readonly inflight = new Set<Promise<unknown>>();
+  private disposePromise: Promise<void> | undefined;
   readonly resolved: Partial<T>;
 
   constructor(
@@ -22,16 +39,72 @@ class FullyDefinedContainer<
     this.dependencies = dependencies;
     this.registeredFactories = factories;
     this.resolved = { ...values, ...overrides } as Partial<T>;
+    this.known = new Set(
+      Reflect.ownKeys(this.resolved).map((key) => this.resolved[key as keyof T]),
+    );
   }
 
   async get<K extends keyof T>(key: K): Promise<T[K]> {
-    return get(
+    if (this.disposePromise) {
+      throw new Error("Container is disposed");
+    }
+
+    const promise = get(
       this.dependencies,
       this.resolved,
       this.registeredFactories as unknown as Partial<Record<keyof T, (dependencies: T) => unknown>>,
       key,
       this.pending,
+      (value) => this.onFactoryResult(value),
     );
+    this.inflight.add(promise);
+    try {
+      return await promise;
+    } finally {
+      this.inflight.delete(promise);
+    }
+  }
+
+  dispose(): Promise<void> {
+    this.disposePromise ??= this.disposeAll();
+    return this.disposePromise;
+  }
+
+  [Symbol.asyncDispose](): Promise<void> {
+    return this.dispose();
+  }
+
+  private onFactoryResult(value: unknown): void {
+    if (this.known.has(value)) {
+      return;
+    }
+
+    this.known.add(value);
+    if (isDisposable(value)) {
+      this.owned.push(value);
+    }
+  }
+
+  private async disposeAll(): Promise<void> {
+    await Promise.allSettled(this.inflight);
+
+    const errors: unknown[] = [];
+    for (const value of this.owned.toReversed()) {
+      try {
+        const asyncDispose = value[Symbol.asyncDispose];
+        if (asyncDispose) {
+          await asyncDispose.call(value);
+        } else {
+          value[Symbol.dispose]?.();
+        }
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+
+    if (errors.length > 0) {
+      throw new AggregateError(errors, "Failed to dispose container resources");
+    }
   }
 }
 
