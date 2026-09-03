@@ -169,6 +169,23 @@ describe("Container", () => {
     expect(createApiClient).toHaveBeenCalledOnce();
   });
 
+  it("skips in-flight tracking for a cached value", async () => {
+    const container = new Container<Definition, typeof dependencies>(dependencies)
+      .factory({
+        apiClient: inject(ApiClient),
+        service: inject(Service),
+      })
+      .value({ baseUrl: "https://example.com" });
+    const inflight = Reflect.get(container, "inflight") as Set<Promise<unknown>>;
+    const trackInflight = vi.spyOn(inflight, "add");
+    await container.get("service");
+    trackInflight.mockClear();
+
+    await container.get("service");
+
+    expect(trackInflight).not.toHaveBeenCalled();
+  });
+
   it("uses the latest factory when a key is registered again", async () => {
     const result = await new Container<Definition, typeof dependencies>(dependencies)
       .factory({

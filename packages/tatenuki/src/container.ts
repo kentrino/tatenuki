@@ -49,6 +49,10 @@ class FullyDefinedContainer<
       throw new Error("Container is disposed");
     }
 
+    if (Object.hasOwn(this.resolved, key)) {
+      return this.resolved[key] as T[K];
+    }
+
     const promise = get(
       this.dependencies,
       this.resolved,
