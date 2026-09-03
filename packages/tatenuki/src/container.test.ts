@@ -169,6 +169,33 @@ describe("Container", () => {
     expect(createApiClient).toHaveBeenCalledOnce();
   });
 
+  it("keeps small non-disposable resolutions in compact ownership storage", async () => {
+    type Values = {
+      seed: string;
+      first: object;
+      second: object;
+    };
+    const graph = {
+      seed: [],
+      first: ["seed"],
+      second: ["first"],
+    } as const;
+    const first = {};
+    const second = {};
+    const container = defineContainer<Values>()
+      .graph(graph)
+      .factories({
+        first: () => first,
+        second: () => second,
+      })
+      .build({ seed: "seed" });
+
+    await container.get("second");
+
+    expect(Reflect.get(container, "known")).toEqual(["seed", first, second]);
+    expect(Reflect.get(container, "owned")).toBeUndefined();
+  });
+
   it("skips in-flight tracking for a cached value", async () => {
     const container = new Container<Definition, typeof dependencies>(dependencies)
       .factory({

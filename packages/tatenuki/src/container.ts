@@ -14,6 +14,8 @@ type GetPlanEntry = {
 
 type GetPlanCache = Map<PropertyKey, GetPlanEntry[]>;
 
+const KNOWN_VALUE_ARRAY_LIMIT = 8;
+
 function snapshotDependencies<D extends Record<PropertyKey, readonly PropertyKey[]>>(
   dependencies: D,
 ): D {
@@ -45,8 +47,8 @@ class FullyDefinedContainer<
   private readonly dependencies: D;
   private readonly registeredFactories: PartialFactories<T, D, FactoryKeys>;
   private readonly pending = new Map<PropertyKey, Promise<unknown>>();
-  private readonly known: Set<unknown>;
-  private readonly owned: DisposableValue[] = [];
+  private known: unknown[] | Set<unknown>;
+  private owned: DisposableValue[] | undefined;
   private readonly inflight = new Set<Promise<unknown>>();
   private readonly planCache: GetPlanCache;
   private readonly initialResolvedKeys: readonly PropertyKey[];
@@ -66,7 +68,7 @@ class FullyDefinedContainer<
     this.resolved = { ...values, ...overrides } as Partial<T>;
     this.planCache = planCache;
     this.initialResolvedKeys = Reflect.ownKeys(this.resolved);
-    this.known = new Set(this.initialResolvedKeys.map((key) => this.resolved[key as keyof T]));
+    this.known = this.initialResolvedKeys.map((key) => this.resolved[key as keyof T]);
   }
 
   async get<K extends keyof T>(key: K): Promise<T[K]> {
@@ -128,18 +130,43 @@ class FullyDefinedContainer<
 
   private onFactoryResult(value: unknown): void {
     this.hasFactoryResult = true;
-    if (this.known.has(value)) {
+    if (!this.addKnownValue(value)) {
       return;
     }
 
-    this.known.add(value);
     if (isDisposable(value)) {
-      this.owned.push(value);
+      (this.owned ??= []).push(value);
     }
+  }
+
+  private addKnownValue(value: unknown): boolean {
+    if (Array.isArray(this.known)) {
+      if (this.known.includes(value)) {
+        return false;
+      }
+
+      if (this.known.length < KNOWN_VALUE_ARRAY_LIMIT) {
+        this.known.push(value);
+        return true;
+      }
+
+      this.known = new Set(this.known);
+    }
+
+    if (this.known.has(value)) {
+      return false;
+    }
+
+    this.known.add(value);
+    return true;
   }
 
   private async disposeAll(): Promise<void> {
     await Promise.allSettled(this.inflight);
+
+    if (!this.owned) {
+      return;
+    }
 
     const errors: unknown[] = [];
     for (const value of this.owned.toReversed()) {
