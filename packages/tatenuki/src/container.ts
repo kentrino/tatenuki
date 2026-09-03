@@ -1,4 +1,4 @@
-import { get } from "./get.ts";
+import { createGetPlan, getWithPlan } from "./get.ts";
 import { resolve } from "./resolve.ts";
 import type { DependenciesOf, PartialFactories, PartialValues } from "./type.ts";
 
@@ -6,6 +6,27 @@ type DisposableValue = {
   [Symbol.asyncDispose]?: () => PromiseLike<void>;
   [Symbol.dispose]?: () => void;
 };
+
+type GetPlanEntry = {
+  readonly resolvedKeys: readonly PropertyKey[];
+  readonly plan: readonly PropertyKey[];
+};
+
+type GetPlanCache = Map<PropertyKey, GetPlanEntry[]>;
+
+function snapshotDependencies<D extends Record<PropertyKey, readonly PropertyKey[]>>(
+  dependencies: D,
+): D {
+  const snapshot = Object.create(null) as Record<PropertyKey, readonly PropertyKey[]>;
+  for (const key of Reflect.ownKeys(dependencies)) {
+    snapshot[key] = Object.freeze([...dependencies[key]]);
+  }
+  return Object.freeze(snapshot) as D;
+}
+
+function hasSameKeys(left: readonly PropertyKey[], right: readonly PropertyKey[]): boolean {
+  return left.length === right.length && left.every((key, index) => key === right[index]);
+}
 
 function isDisposable(value: unknown): value is DisposableValue {
   return (
@@ -27,6 +48,9 @@ class FullyDefinedContainer<
   private readonly known: Set<unknown>;
   private readonly owned: DisposableValue[] = [];
   private readonly inflight = new Set<Promise<unknown>>();
+  private readonly planCache: GetPlanCache;
+  private readonly initialResolvedKeys: readonly PropertyKey[];
+  private hasFactoryResult = false;
   private disposePromise: Promise<void> | undefined;
   readonly resolved: Partial<T>;
 
@@ -35,13 +59,14 @@ class FullyDefinedContainer<
     factories: PartialFactories<T, D, FactoryKeys>,
     values: PartialValues<T, ValueKeys>,
     overrides: Partial<T>,
+    planCache: GetPlanCache,
   ) {
     this.dependencies = dependencies;
     this.registeredFactories = factories;
     this.resolved = { ...values, ...overrides } as Partial<T>;
-    this.known = new Set(
-      Reflect.ownKeys(this.resolved).map((key) => this.resolved[key as keyof T]),
-    );
+    this.planCache = planCache;
+    this.initialResolvedKeys = Reflect.ownKeys(this.resolved);
+    this.known = new Set(this.initialResolvedKeys.map((key) => this.resolved[key as keyof T]));
   }
 
   async get<K extends keyof T>(key: K): Promise<T[K]> {
@@ -53,11 +78,11 @@ class FullyDefinedContainer<
       return this.resolved[key] as T[K];
     }
 
-    const promise = get(
-      this.dependencies,
+    const promise = getWithPlan(
       this.resolved,
       this.registeredFactories as unknown as Partial<Record<keyof T, (dependencies: T) => unknown>>,
       key,
+      this.getPlan(key),
       this.pending,
       (value) => this.onFactoryResult(value),
     );
@@ -78,7 +103,31 @@ class FullyDefinedContainer<
     return this.dispose();
   }
 
+  private getPlan(key: PropertyKey): readonly PropertyKey[] {
+    if (!this.hasFactoryResult) {
+      const entries = this.planCache.get(key);
+      const cached = entries?.find(({ resolvedKeys }) =>
+        hasSameKeys(resolvedKeys, this.initialResolvedKeys),
+      );
+      if (cached) {
+        return cached.plan;
+      }
+
+      const plan = createGetPlan(this.dependencies, this.resolved, key);
+      const entry = { resolvedKeys: this.initialResolvedKeys, plan };
+      if (entries) {
+        entries.push(entry);
+      } else {
+        this.planCache.set(key, [entry]);
+      }
+      return plan;
+    }
+
+    return createGetPlan(this.dependencies, this.resolved, key);
+  }
+
   private onFactoryResult(value: unknown): void {
+    this.hasFactoryResult = true;
     if (this.known.has(value)) {
       return;
     }
@@ -122,6 +171,7 @@ export class Container<
   private readonly registeredFactories: PartialFactories<T, D, FactoryKeys>;
   private readonly values: PartialValues<T, ValueKeys>;
   private readonly overrides: Partial<T>;
+  private readonly planCache = new Map<PropertyKey, GetPlanEntry[]>();
 
   constructor(
     dependencies: D,
@@ -129,7 +179,7 @@ export class Container<
     values: PartialValues<T, ValueKeys> = {} as PartialValues<T, ValueKeys>,
     overrides: Partial<T> = {},
   ) {
-    this.dependencies = dependencies;
+    this.dependencies = snapshotDependencies(dependencies);
     this.registeredFactories = factories;
     this.values = values;
     this.overrides = overrides;
@@ -170,6 +220,7 @@ export class Container<
       this.registeredFactories,
       values,
       this.overrides,
+      this.planCache,
     );
   }
 
