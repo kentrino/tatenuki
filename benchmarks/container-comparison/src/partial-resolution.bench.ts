@@ -5,6 +5,8 @@ import { defineContainer } from "../../../packages/tatenuki/src/index.ts";
 const COMPONENT_COUNT = 1_000;
 const COMPONENT_KEYS = Array.from({ length: COMPONENT_COUNT }, (_, index) => `component${index}`);
 const TARGET_KEY = COMPONENT_KEYS.at(-1) as string;
+const LAZY_ROOTS = ["component10", "component20", "component30", TARGET_KEY] as const;
+const LAZY_ROOT_FACTORY_COUNT = 6;
 
 type Definition = Record<string, number>;
 type Factory = (dependencies: Definition) => number;
@@ -101,6 +103,22 @@ beforeAll(async () => {
 
   expect(tatenukiCreated).toBe(3);
   expect(inferDICreated).toBe(3);
+
+  let tatenukiLazyCreated = 0;
+  const lazyBuilder = createTatenukiBuilder(() => tatenukiLazyCreated++);
+  const lazyContainer = lazyBuilder.build({});
+  for (const key of LAZY_ROOTS) {
+    await lazyContainer.get(key);
+  }
+
+  let inferDILazyCreated = 0;
+  const inferDILazy = createInferDIContainer(false, () => inferDILazyCreated++);
+  for (const key of LAZY_ROOTS) {
+    inferDILazy.get(key);
+  }
+
+  expect(tatenukiLazyCreated).toBe(LAZY_ROOT_FACTORY_COUNT);
+  expect(inferDILazyCreated).toBe(LAZY_ROOT_FACTORY_COUNT);
 });
 
 afterAll(() => {
@@ -138,5 +156,28 @@ describe(`${COMPONENT_COUNT.toLocaleString()} components registered into each fr
   bench("InferDI (register + sync first get, fast)", () => {
     const container = createInferDIContainer(true);
     _sink = container.get(TARGET_KEY);
+  });
+});
+
+describe(`${COMPONENT_COUNT.toLocaleString()} preconfigured components, 4 lazy roots in a fresh context`, () => {
+  bench("tatenuki (build from reused builder + async get)", async () => {
+    const container = createTatenukiContainer();
+    for (const key of LAZY_ROOTS) {
+      _sink = await container.get(key);
+    }
+  });
+
+  bench("InferDI (create scope + sync get, default)", () => {
+    const scope = inferDIDefaultRoot.createScope();
+    for (const key of LAZY_ROOTS) {
+      _sink = scope.get(key);
+    }
+  });
+
+  bench("InferDI (create scope + sync get, fast)", () => {
+    const scope = inferDIFastRoot.createScope();
+    for (const key of LAZY_ROOTS) {
+      _sink = scope.get(key);
+    }
   });
 });

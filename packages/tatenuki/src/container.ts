@@ -91,6 +91,7 @@ class FullyDefinedContainer<
   private inflight: Promise<unknown> | Set<Promise<unknown>> | undefined;
   private readonly planCache: GetPlanCache;
   private readonly initialResolvedKeys: readonly PropertyKey[];
+  private initialResolvedForPlan: Partial<T> | undefined;
   private hasFactoryResult = false;
   private readonly lifecycle: ContainerLifecycle = { disposePromise: undefined };
   readonly resolved: Partial<T>;
@@ -153,26 +154,39 @@ class FullyDefinedContainer<
   }
 
   private getPlan(key: PropertyKey): readonly PropertyKey[] {
-    if (!this.hasFactoryResult) {
-      const entries = this.planCache.get(key);
-      const cached = entries?.find(({ resolvedKeys }) =>
-        hasSameKeys(resolvedKeys, this.initialResolvedKeys),
-      );
-      if (cached) {
-        return cached.plan;
-      }
-
-      const plan = createGetPlan(this.dependencies, this.resolved, key);
-      const entry = { resolvedKeys: this.initialResolvedKeys, plan };
-      if (entries) {
-        entries.push(entry);
-      } else {
-        this.planCache.set(key, [entry]);
-      }
-      return plan;
+    const entries = this.planCache.get(key);
+    const cached = entries?.find(({ resolvedKeys }) =>
+      hasSameKeys(resolvedKeys, this.initialResolvedKeys),
+    );
+    if (cached) {
+      return cached.plan;
     }
 
-    return createGetPlan(this.dependencies, this.resolved, key);
+    const plan = createGetPlan(this.dependencies, this.resolvedForPlan(), key);
+    const entry = { resolvedKeys: this.initialResolvedKeys, plan };
+    if (entries) {
+      entries.push(entry);
+    } else {
+      this.planCache.set(key, [entry]);
+    }
+    return plan;
+  }
+
+  private resolvedForPlan(): Partial<T> {
+    if (!this.hasFactoryResult) {
+      return this.resolved;
+    }
+
+    if (this.initialResolvedForPlan) {
+      return this.initialResolvedForPlan;
+    }
+
+    const snapshot = Object.create(null) as Partial<T>;
+    for (const key of this.initialResolvedKeys) {
+      snapshot[key as keyof T] = this.resolved[key as keyof T];
+    }
+    this.initialResolvedForPlan = snapshot;
+    return snapshot;
   }
 
   private onFactoryResult(value: unknown): void {
