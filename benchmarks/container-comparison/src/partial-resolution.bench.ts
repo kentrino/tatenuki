@@ -12,6 +12,7 @@ type Definition = Record<string, number>;
 type Factory = (dependencies: Definition) => number;
 type DynamicTatenukiContainer = {
   get(key: string): Promise<number>;
+  resolveAll(): Promise<{ get(key: string): number }>;
 };
 type DynamicTatenukiBuilder = {
   build(values: Record<string, never>): DynamicTatenukiContainer;
@@ -119,6 +120,19 @@ beforeAll(async () => {
 
   expect(tatenukiLazyCreated).toBe(LAZY_ROOT_FACTORY_COUNT);
   expect(inferDILazyCreated).toBe(LAZY_ROOT_FACTORY_COUNT);
+
+  let tatenukiResolveAllCreated = 0;
+  const resolveAllBuilder = createTatenukiBuilder(() => tatenukiResolveAllCreated++);
+  await resolveAllBuilder.build({}).resolveAll();
+
+  let inferDIResolveAllCreated = 0;
+  const inferDIResolveAll = createInferDIContainer(false, () => inferDIResolveAllCreated++);
+  for (const key of COMPONENT_KEYS) {
+    inferDIResolveAll.get(key);
+  }
+
+  expect(tatenukiResolveAllCreated).toBe(COMPONENT_COUNT);
+  expect(inferDIResolveAllCreated).toBe(COMPONENT_COUNT);
 });
 
 afterAll(() => {
@@ -177,6 +191,27 @@ describe(`${COMPONENT_COUNT.toLocaleString()} preconfigured components, 4 lazy r
   bench("InferDI (create scope + sync get, fast)", () => {
     const scope = inferDIFastRoot.createScope();
     for (const key of LAZY_ROOTS) {
+      _sink = scope.get(key);
+    }
+  });
+});
+
+describe(`${COMPONENT_COUNT.toLocaleString()} preconfigured components, resolve all in a fresh context`, () => {
+  bench("tatenuki (build from reused builder + resolveAll)", async () => {
+    const container = createTatenukiContainer();
+    _sink = await container.resolveAll();
+  });
+
+  bench("InferDI (create scope + sync get all, default)", () => {
+    const scope = inferDIDefaultRoot.createScope();
+    for (const key of COMPONENT_KEYS) {
+      _sink = scope.get(key);
+    }
+  });
+
+  bench("InferDI (create scope + sync get all, fast)", () => {
+    const scope = inferDIFastRoot.createScope();
+    for (const key of COMPONENT_KEYS) {
       _sink = scope.get(key);
     }
   });

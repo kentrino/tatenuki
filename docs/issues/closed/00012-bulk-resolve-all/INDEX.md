@@ -16,4 +16,4 @@ Resolve the full graph through one bulk execution path instead of awaiting publi
 
 # Hypothesis
 
-A single full-graph plan or equivalent bulk resolver will reduce eager-resolution time, especially for large graphs. Declared dependencies must still resolve before dependents. Add `resolveAll()` benchmarks for synchronous and mixed async DAGs and compare both throughput and allocations.
+A single full-graph plan will reduce eager-resolution time, especially for large graphs. Declared dependencies must still resolve before dependents. Measure the 1,000-component `resolveAll()` comparison.

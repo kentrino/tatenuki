@@ -1,4 +1,4 @@
-import { createGetPlan, getWithPlan } from "./get.ts";
+import { createGetPlan, createResolveAllPlan, getWithPlan, resolveWithPlan } from "./get.ts";
 import { resolve } from "./resolve.ts";
 import type { DependenciesOf, PartialFactories, PartialValues } from "./type.ts";
 
@@ -25,6 +25,7 @@ export interface ResolvedContainer<T extends Record<PropertyKey, unknown>> {
 }
 
 const KNOWN_VALUE_ARRAY_LIMIT = 8;
+const RESOLVE_ALL_PLAN_KEY = Symbol("resolveAll");
 
 function snapshotDependencies<D extends Record<PropertyKey, readonly PropertyKey[]>>(
   dependencies: D,
@@ -137,8 +138,32 @@ class FullyDefinedContainer<
   }
 
   async resolveAll(): Promise<ResolvedContainer<T>> {
-    for (const key of Reflect.ownKeys(this.dependencies) as (keyof T)[]) {
-      await this.get(key);
+    if (this.lifecycle.disposePromise) {
+      throw new Error("Container is disposed");
+    }
+
+    const plan = this.getResolveAllPlan();
+    if (plan.length > 0) {
+      const promise = resolveWithPlan(
+        this.resolved,
+        this.registeredFactories as unknown as Partial<
+          Record<keyof T, (dependencies: T) => unknown>
+        >,
+        plan,
+        this.pending,
+        (value) => this.onFactoryResult(value),
+        () => {
+          if (this.lifecycle.disposePromise) {
+            throw new Error("Container is disposed");
+          }
+        },
+      );
+      this.trackInflight(promise);
+      try {
+        await promise;
+      } finally {
+        this.untrackInflight(promise);
+      }
     }
 
     return new ResolvedContainerImpl(this.resolved as T, this.lifecycle, () => this.dispose());
@@ -154,6 +179,21 @@ class FullyDefinedContainer<
   }
 
   private getPlan(key: PropertyKey): readonly PropertyKey[] {
+    return this.planFromCache(key, () =>
+      createGetPlan(this.dependencies, this.resolvedForPlan(), key),
+    );
+  }
+
+  private getResolveAllPlan(): readonly PropertyKey[] {
+    return this.planFromCache(RESOLVE_ALL_PLAN_KEY, () =>
+      createResolveAllPlan(this.dependencies, this.resolvedForPlan()),
+    );
+  }
+
+  private planFromCache(
+    key: PropertyKey,
+    createPlan: () => readonly PropertyKey[],
+  ): readonly PropertyKey[] {
     const entries = this.planCache.get(key);
     const cached = entries?.find(({ resolvedKeys }) =>
       hasSameKeys(resolvedKeys, this.initialResolvedKeys),
@@ -162,7 +202,7 @@ class FullyDefinedContainer<
       return cached.plan;
     }
 
-    const plan = createGetPlan(this.dependencies, this.resolvedForPlan(), key);
+    const plan = createPlan();
     const entry = { resolvedKeys: this.initialResolvedKeys, plan };
     if (entries) {
       entries.push(entry);

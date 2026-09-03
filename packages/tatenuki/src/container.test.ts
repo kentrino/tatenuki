@@ -185,6 +185,154 @@ describe("Container", () => {
     expect(service.apiClient.baseUrl).toBe("https://example.com");
   });
 
+  it("resolves the full graph through one plan and does not rerun completed factories", async () => {
+    type Values = {
+      first: string;
+      second: string;
+      third: string;
+    };
+    const graph = {
+      third: ["second"],
+      second: ["first"],
+      first: [],
+    } as const;
+    const executionOrder: string[] = [];
+    const createFirst = vi.fn(() => {
+      executionOrder.push("first");
+      return "first";
+    });
+    const createSecond = vi.fn(({ first }: Pick<Values, "first">) => {
+      executionOrder.push("second");
+      return `${first}-second`;
+    });
+    const createThird = vi.fn(({ second }: Pick<Values, "second">) => {
+      executionOrder.push("third");
+      return `${second}-third`;
+    });
+    const container = defineContainer<Values>()
+      .graph(graph)
+      .factories({
+        first: createFirst,
+        second: createSecond,
+        third: createThird,
+      })
+      .build({});
+
+    await container.get("second");
+    const resolved = await container.resolveAll();
+
+    expect(executionOrder).toEqual(["first", "second", "third"]);
+    expect(createFirst).toHaveBeenCalledOnce();
+    expect(createSecond).toHaveBeenCalledOnce();
+    expect(createThird).toHaveBeenCalledOnce();
+    expect(resolved.get("third")).toBe("first-second-third");
+  });
+
+  it("does not start independent factories in parallel during resolveAll", async () => {
+    type Values = {
+      first: string;
+      second: string;
+    };
+    const graph = {
+      first: [],
+      second: [],
+    } as const;
+    let inFlight = 0;
+    let maxInFlight = 0;
+    let releaseFirst: () => void = () => undefined;
+    const firstBlocked = new Promise<void>((resolveBlocked) => {
+      releaseFirst = resolveBlocked;
+    });
+    let secondStarted = false;
+    const container = defineContainer<Values>()
+      .graph(graph)
+      .factories({
+        first: async () => {
+          inFlight += 1;
+          maxInFlight = Math.max(maxInFlight, inFlight);
+          await firstBlocked;
+          inFlight -= 1;
+          return "first";
+        },
+        second: async () => {
+          secondStarted = true;
+          inFlight += 1;
+          maxInFlight = Math.max(maxInFlight, inFlight);
+          inFlight -= 1;
+          return "second";
+        },
+      })
+      .build({});
+
+    const resolved = container.resolveAll();
+    await Promise.resolve();
+    expect(secondStarted).toBe(false);
+
+    releaseFirst();
+    await resolved;
+
+    expect(maxInFlight).toBe(1);
+    expect(secondStarted).toBe(true);
+  });
+
+  it("reports resolveAll cycles and missing factories with the get() error strings", async () => {
+    const defineUnchecked = defineContainer as unknown as () => {
+      graph(dependencies: Record<string, readonly string[]>): {
+        factories(factories: Record<string, (values: Record<string, string>) => string>): {
+          build(values: Record<string, never>): { resolveAll(): Promise<unknown> };
+        };
+      };
+    };
+    const cyclic = defineUnchecked()
+      .graph({
+        first: ["second"],
+        second: ["first"],
+      })
+      .factories({
+        first: ({ second }) => second,
+        second: ({ first }) => first,
+      })
+      .build({});
+
+    await expect(cyclic.resolveAll()).rejects.toThrow("Circular dependency");
+
+    const missing = defineContainer<{ missing: string }>()
+      .graph({ missing: [] } as const)
+      .build({} as never);
+
+    await expect(missing.resolveAll()).rejects.toThrow("No factory for missing");
+  });
+
+  it("rejects resolveAll after disposal and during an in-flight bulk resolution", async () => {
+    type Values = { first: string; second: string };
+    const graph = {
+      first: [],
+      second: ["first"],
+    } as const;
+    let release: () => void = () => undefined;
+    const blocked = new Promise<void>((resolveBlocked) => {
+      release = resolveBlocked;
+    });
+    const container = defineContainer<Values>()
+      .graph(graph)
+      .factories({
+        first: async () => {
+          await blocked;
+          return "first";
+        },
+        second: () => "second",
+      })
+      .build({});
+
+    const resolving = container.resolveAll();
+    const disposal = container.dispose();
+    await expect(container.resolveAll()).rejects.toThrow("Container is disposed");
+
+    release();
+    await expect(resolving).rejects.toThrow("Container is disposed");
+    await disposal;
+  });
+
   it("keeps small non-disposable resolutions in compact ownership storage", async () => {
     type Values = {
       seed: string;
