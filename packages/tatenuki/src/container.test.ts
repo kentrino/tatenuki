@@ -169,6 +169,22 @@ describe("Container", () => {
     expect(createApiClient).toHaveBeenCalledOnce();
   });
 
+  it("resolves every factory before enabling synchronous get", async () => {
+    const container = defineContainer<Definition>()
+      .graph(dependencies)
+      .factories({
+        apiClient: async ({ baseUrl }) => new ApiClient({ baseUrl }),
+        service: inject(Service),
+      })
+      .build({ baseUrl: "https://example.com" });
+
+    const resolved = await container.resolveAll();
+    const service = resolved.get("service");
+
+    expectTypeOf(service).toEqualTypeOf<Service>();
+    expect(service.apiClient.baseUrl).toBe("https://example.com");
+  });
+
   it("keeps small non-disposable resolutions in compact ownership storage", async () => {
     type Values = {
       seed: string;
@@ -462,6 +478,28 @@ describe("Container", () => {
     expect(first).toBe(second);
     await Promise.all([first, second]);
     expect(disposeResource).toHaveBeenCalledOnce();
+  });
+
+  it("shares disposal state with a fully resolved container", async () => {
+    type Values = { resource: Disposable };
+    const graph = { resource: [] } as const;
+    const disposeResource = vi.fn();
+    const container = defineContainer<Values>()
+      .graph(graph)
+      .factories({
+        resource: () => ({ [Symbol.dispose]: disposeResource }),
+      })
+      .build({});
+    const resolved = await container.resolveAll();
+
+    const first = resolved.dispose();
+    const second = container.dispose();
+
+    expect(first).toBe(second);
+    await first;
+    expect(disposeResource).toHaveBeenCalledOnce();
+    expect(() => resolved.get("resource")).toThrow("Container is disposed");
+    await expect(container.get("resource")).rejects.toThrow("Container is disposed");
   });
 
   it("waits for active resolutions and rejects new resolutions during disposal", async () => {
