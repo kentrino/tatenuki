@@ -83,12 +83,16 @@ describe("cached singleton get", async () => {
   const inferDIDefault = createInferDIContainer(false);
   const inferDIFast = createInferDIContainer(true);
 
-  await tatenuki.get("service");
+  const resolvedTatenuki = await tatenuki.resolveAll();
   inferDIDefault.get("service");
   inferDIFast.get("service");
 
   bench("tatenuki (async get)", async () => {
     _sink = await tatenuki.get("service");
+  });
+
+  bench("tatenuki (sync get after resolveAll)", () => {
+    _sink = resolvedTatenuki.get("service");
   });
 
   bench("InferDI (sync get, default)", () => {

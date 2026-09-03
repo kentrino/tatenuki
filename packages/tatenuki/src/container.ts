@@ -14,6 +14,16 @@ type GetPlanEntry = {
 
 type GetPlanCache = Map<PropertyKey, GetPlanEntry[]>;
 
+type ContainerLifecycle = {
+  disposePromise: Promise<void> | undefined;
+};
+
+export interface ResolvedContainer<T extends Record<PropertyKey, unknown>> {
+  get<K extends keyof T>(key: K): T[K];
+  dispose(): Promise<void>;
+  [Symbol.asyncDispose](): Promise<void>;
+}
+
 const KNOWN_VALUE_ARRAY_LIMIT = 8;
 
 function snapshotDependencies<D extends Record<PropertyKey, readonly PropertyKey[]>>(
@@ -38,6 +48,35 @@ function isDisposable(value: unknown): value is DisposableValue {
   );
 }
 
+class ResolvedContainerImpl<
+  T extends Record<PropertyKey, unknown>,
+> implements ResolvedContainer<T> {
+  private readonly values: T;
+  private readonly lifecycle: ContainerLifecycle;
+  private readonly disposeContainer: () => Promise<void>;
+
+  constructor(values: T, lifecycle: ContainerLifecycle, disposeContainer: () => Promise<void>) {
+    this.values = values;
+    this.lifecycle = lifecycle;
+    this.disposeContainer = disposeContainer;
+  }
+
+  get<K extends keyof T>(key: K): T[K] {
+    if (this.lifecycle.disposePromise) {
+      throw new Error("Container is disposed");
+    }
+    return this.values[key];
+  }
+
+  dispose(): Promise<void> {
+    return this.disposeContainer();
+  }
+
+  [Symbol.asyncDispose](): Promise<void> {
+    return this.dispose();
+  }
+}
+
 class FullyDefinedContainer<
   T extends Record<PropertyKey, unknown>,
   D extends DependenciesOf<D, keyof T>,
@@ -53,7 +92,7 @@ class FullyDefinedContainer<
   private readonly planCache: GetPlanCache;
   private readonly initialResolvedKeys: readonly PropertyKey[];
   private hasFactoryResult = false;
-  private disposePromise: Promise<void> | undefined;
+  private readonly lifecycle: ContainerLifecycle = { disposePromise: undefined };
   readonly resolved: Partial<T>;
 
   constructor(
@@ -72,7 +111,7 @@ class FullyDefinedContainer<
   }
 
   async get<K extends keyof T>(key: K): Promise<T[K]> {
-    if (this.disposePromise) {
+    if (this.lifecycle.disposePromise) {
       throw new Error("Container is disposed");
     }
 
@@ -96,9 +135,17 @@ class FullyDefinedContainer<
     }
   }
 
+  async resolveAll(): Promise<ResolvedContainer<T>> {
+    for (const key of Reflect.ownKeys(this.dependencies) as (keyof T)[]) {
+      await this.get(key);
+    }
+
+    return new ResolvedContainerImpl(this.resolved as T, this.lifecycle, () => this.dispose());
+  }
+
   dispose(): Promise<void> {
-    this.disposePromise ??= this.disposeAll();
-    return this.disposePromise;
+    this.lifecycle.disposePromise ??= this.disposeAll();
+    return this.lifecycle.disposePromise;
   }
 
   [Symbol.asyncDispose](): Promise<void> {
