@@ -1,6 +1,3 @@
-type IfEquals<X, Y, Then = X, Else = never> =
-  (<T>() => T extends X ? 1 : 2) extends <T>() => T extends Y ? 1 : 2 ? Then : Else;
-
 export type DependencyGraph<T extends object> = {
   [K in keyof T]: readonly (keyof T)[];
 };
@@ -13,16 +10,21 @@ export type DependantsOf<T extends object, Key extends keyof T> = {
     : never;
 }[keyof T];
 
-type DependantsOfWithHalt<T extends object, Key extends keyof T> = IfEquals<
-  DependantsOf<T, DependantsOf<T, Key>>,
-  DependantsOf<T, Key>,
-  DependantsOf<T, Key>,
-  DependantsOf<T, DependantsOf<T, Key>> | DependantsOf<T, Key>
->;
+type DependantsOfRecursiveWithSeen<
+  T extends object,
+  Pending extends keyof T,
+  Seen extends keyof T = never,
+> =
+  Exclude<Pending, Seen> extends infer Unseen extends keyof T
+    ? [Unseen] extends [never]
+      ? Seen
+      : DependantsOfRecursiveWithSeen<T, DependantsOf<T, Unseen>, Seen | Unseen>
+    : never;
 
-export type DependantsOfRecursive<T extends object, Key extends keyof T> =
-  | DependantsOfWithHalt<T, DependantsOfWithHalt<T, Key>>
-  | DependantsOf<T, Key>;
+export type DependantsOfRecursive<T extends object, Key extends keyof T> = Exclude<
+  DependantsOfRecursiveWithSeen<T, DependantsOf<T, Key>>,
+  Key
+>;
 
 export type DependenciesOf<T extends object, DefinitionKeys extends PropertyKey> = {
   [K in keyof T & DefinitionKeys]: readonly Exclude<

@@ -26,6 +26,16 @@ const graph = {
   controller: ["service"],
 } as const satisfies DependencyGraph<Definition>;
 
+const deepGraph = {
+  level0: [],
+  level1: ["level0"],
+  level2: ["level1"],
+  level3: ["level2"],
+  level4: ["level3"],
+  level5: ["level4"],
+  level6: ["level5"],
+} as const satisfies DependencyGraph<Record<`level${0 | 1 | 2 | 3 | 4 | 5 | 6}`, unknown>>;
+
 describe("dependency graph types", () => {
   it("describes every dependency key", () => {
     expectTypeOf(graph).toMatchTypeOf<DependencyGraph<Definition>>();
@@ -48,6 +58,22 @@ describe("dependency graph types", () => {
       "service" | "controller"
     >();
     expectTypeOf<DependantsOfRecursive<typeof graph, "controller">>().toEqualTypeOf<never>();
+  });
+
+  it("finds transitive dependants beyond four levels", () => {
+    expectTypeOf<DependantsOfRecursive<typeof deepGraph, "level0">>().toEqualTypeOf<
+      "level1" | "level2" | "level3" | "level4" | "level5" | "level6"
+    >();
+  });
+
+  it("stops at already-seen keys in a cycle", () => {
+    const cyclicGraph = {
+      a: ["c"],
+      b: ["a"],
+      c: ["b"],
+    } as const satisfies DependencyGraph<Record<"a" | "b" | "c", unknown>>;
+
+    expectTypeOf<DependantsOfRecursive<typeof cyclicGraph, "a">>().toEqualTypeOf<"b" | "c">();
   });
 
   it("excludes self and transitive dependants from valid dependencies", () => {
