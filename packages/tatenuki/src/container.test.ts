@@ -212,21 +212,66 @@ describe("Container", () => {
     expect(Reflect.get(container, "owned")).toBeUndefined();
   });
 
-  it("skips in-flight tracking for a cached value", async () => {
+  it("does not start in-flight tracking for a cached value", async () => {
     const container = new Container<Definition, typeof dependencies>(dependencies)
       .factory({
         apiClient: inject(ApiClient),
         service: inject(Service),
       })
       .value({ baseUrl: "https://example.com" });
-    const inflight = Reflect.get(container, "inflight") as Set<Promise<unknown>>;
-    const trackInflight = vi.spyOn(inflight, "add");
     await container.get("service");
-    trackInflight.mockClear();
 
     await container.get("service");
 
-    expect(trackInflight).not.toHaveBeenCalled();
+    expect(Reflect.get(container, "inflight")).toBeUndefined();
+  });
+
+  it("allocates an in-flight set only for concurrent resolutions", async () => {
+    type Values = {
+      first: string;
+      second: string;
+    };
+    const graph = {
+      first: [],
+      second: [],
+    } as const;
+    let release: () => void = () => undefined;
+    const blocked = new Promise<void>((resolveBlocked) => {
+      release = resolveBlocked;
+    });
+    const container = defineContainer<Values>()
+      .graph(graph)
+      .factories({
+        first: async () => {
+          await blocked;
+          return "first";
+        },
+        second: async () => {
+          await blocked;
+          return "second";
+        },
+      })
+      .build({});
+
+    const first = container.get("first");
+    expect(Reflect.get(container, "inflight")).toBeInstanceOf(Promise);
+    const second = container.get("second");
+    const inflight = Reflect.get(container, "inflight");
+
+    expect(inflight).toBeInstanceOf(Set);
+    expect(inflight).toHaveProperty("size", 2);
+
+    let disposed = false;
+    const disposal = container.dispose().then(() => {
+      disposed = true;
+    });
+    await Promise.resolve();
+    expect(disposed).toBe(false);
+
+    release();
+    await expect(Promise.all([first, second])).resolves.toEqual(["first", "second"]);
+    await disposal;
+    expect(Reflect.get(container, "inflight")).toBeUndefined();
   });
 
   it("reuses first-resolution plans across containers from the same builder", async () => {

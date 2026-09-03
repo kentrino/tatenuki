@@ -88,7 +88,7 @@ class FullyDefinedContainer<
   private readonly pending = new Map<PropertyKey, Promise<unknown>>();
   private known: unknown[] | Set<unknown>;
   private owned: DisposableValue[] | undefined;
-  private readonly inflight = new Set<Promise<unknown>>();
+  private inflight: Promise<unknown> | Set<Promise<unknown>> | undefined;
   private readonly planCache: GetPlanCache;
   private readonly initialResolvedKeys: readonly PropertyKey[];
   private hasFactoryResult = false;
@@ -127,11 +127,11 @@ class FullyDefinedContainer<
       this.pending,
       (value) => this.onFactoryResult(value),
     );
-    this.inflight.add(promise);
+    this.trackInflight(promise);
     try {
       return await promise;
     } finally {
-      this.inflight.delete(promise);
+      this.untrackInflight(promise);
     }
   }
 
@@ -208,8 +208,39 @@ class FullyDefinedContainer<
     return true;
   }
 
+  private trackInflight(promise: Promise<unknown>): void {
+    if (!this.inflight) {
+      this.inflight = promise;
+      return;
+    }
+
+    if (this.inflight instanceof Set) {
+      this.inflight.add(promise);
+      return;
+    }
+
+    this.inflight = new Set([this.inflight, promise]);
+  }
+
+  private untrackInflight(promise: Promise<unknown>): void {
+    if (this.inflight === promise) {
+      this.inflight = undefined;
+      return;
+    }
+
+    if (this.inflight instanceof Set) {
+      this.inflight.delete(promise);
+      if (this.inflight.size === 0) {
+        this.inflight = undefined;
+      }
+    }
+  }
+
   private async disposeAll(): Promise<void> {
-    await Promise.allSettled(this.inflight);
+    const inflight = this.inflight;
+    if (inflight) {
+      await Promise.allSettled(inflight instanceof Set ? inflight : [inflight]);
+    }
 
     if (!this.owned) {
       return;
