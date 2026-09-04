@@ -7,6 +7,7 @@ const COMPONENT_KEYS = Array.from({ length: COMPONENT_COUNT }, (_, index) => `co
 const TARGET_KEY = COMPONENT_KEYS.at(-1) as string;
 const LAZY_ROOTS = ["component10", "component20", "component30", TARGET_KEY] as const;
 const LAZY_ROOT_FACTORY_COUNT = 6;
+const CONFIGURATION_STEPS = 8;
 
 type Definition = Record<string, number>;
 type Factory = (dependencies: Definition) => number;
@@ -15,12 +16,12 @@ type DynamicTatenukiContainer = {
   resolveAll(): Promise<{ get(key: string): number }>;
 };
 type DynamicTatenukiBuilder = {
+  factory(factories: Record<string, Factory>): DynamicTatenukiBuilder;
+  override(values: Partial<Definition>): DynamicTatenukiBuilder;
   build(values: Record<string, never>): DynamicTatenukiContainer;
 };
 type DynamicTatenukiDefinition = {
-  graph(graph: Record<string, readonly string[]>): {
-    factories(factories: Record<string, Factory>): DynamicTatenukiBuilder;
-  };
+  graph(graph: Record<string, readonly string[]>): DynamicTatenukiBuilder;
 };
 
 const graph: Record<string, readonly string[]> = Object.fromEntries(
@@ -46,10 +47,24 @@ function createFactories(onCreate: () => void): Record<string, Factory> {
 
 function createTatenukiBuilder(onCreate: () => void): DynamicTatenukiBuilder {
   const definition = defineContainer<Definition>() as unknown as DynamicTatenukiDefinition;
-  return definition.graph(graph).factories(createFactories(onCreate));
+  return definition.graph(graph).factory(createFactories(onCreate));
 }
 
 const tatenukiBuilder = createTatenukiBuilder(() => {});
+
+function createConfiguredTatenukiBuilder(): DynamicTatenukiBuilder {
+  const definition = defineContainer<Definition>() as unknown as DynamicTatenukiDefinition;
+  const factories = createFactories(() => {});
+  let builder = definition.graph(graph);
+
+  for (let index = 0; index < CONFIGURATION_STEPS; index += 1) {
+    const key = COMPONENT_KEYS[index];
+    builder = builder.factory({ [key]: factories[key] });
+    builder = builder.override({ [key]: index });
+  }
+
+  return builder;
+}
 
 function createTatenukiContainer() {
   return tatenukiBuilder.build({});
@@ -137,6 +152,12 @@ beforeAll(async () => {
 
 afterAll(() => {
   expect(_sink).toBeDefined();
+});
+
+describe(`${COMPONENT_COUNT.toLocaleString()} components, ${CONFIGURATION_STEPS} factory and override steps`, () => {
+  bench("tatenuki (configure builder)", () => {
+    _sink = createConfiguredTatenukiBuilder();
+  });
 });
 
 describe(`${COMPONENT_COUNT.toLocaleString()} preconfigured components, 3 resolved in a fresh context`, () => {
