@@ -409,6 +409,40 @@ describe("Container", () => {
     expect(Reflect.get(container, "owned")).toBeUndefined();
   });
 
+  it("tracks factory results from later lazy gets on the same container", async () => {
+    type Values = {
+      first: Disposable;
+      second: Disposable;
+      aliasOfFirst: Disposable;
+    };
+    const graph = {
+      first: [],
+      second: [],
+      aliasOfFirst: ["first"],
+    } as const;
+    const disposeFirst = vi.fn();
+    const disposeSecond = vi.fn();
+    const first = { [Symbol.dispose]: disposeFirst };
+    const second = { [Symbol.dispose]: disposeSecond };
+    const container = defineContainer<Values>()
+      .graph(graph)
+      .factories({
+        first: () => first,
+        second: () => second,
+        aliasOfFirst: () => first,
+      })
+      .build({});
+
+    await container.get("first");
+    await container.get("second");
+    await container.get("aliasOfFirst");
+    await container.dispose();
+
+    expect(Reflect.get(container, "owned")).toEqual([first, second]);
+    expect(disposeFirst).toHaveBeenCalledOnce();
+    expect(disposeSecond).toHaveBeenCalledOnce();
+  });
+
   it("disposes a duplicate owned factory result once", async () => {
     type Values = {
       first: Disposable;
