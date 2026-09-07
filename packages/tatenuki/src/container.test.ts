@@ -1192,6 +1192,62 @@ describe("resolution", () => {
     expect(factories.empty).not.toHaveBeenCalled();
   });
 
+  it("resolves a synchronous plan without pending-map tracking and still returns a Promise", async () => {
+    type Values = {
+      first: string;
+      second: string;
+    };
+    const pending = new Map<PropertyKey, Promise<unknown>>();
+    const pendingGet = vi.spyOn(pending, "get");
+    const resolved: Partial<Values> = {};
+    const result = getWithPlan<Values, "second">(
+      resolved,
+      {
+        first: () => "first",
+        second: ({ first }) => `${first}-second`,
+      },
+      "second",
+      ["first", "second"],
+      pending,
+    );
+
+    expect(result).toBeInstanceOf(Promise);
+    await expect(result).resolves.toBe("first-second");
+    expect(pendingGet).not.toHaveBeenCalled();
+    expect(pending.size).toBe(0);
+    expect(resolved).toEqual({ first: "first", second: "first-second" });
+  });
+
+  it("awaits a thenable after earlier synchronous factories in the same plan", async () => {
+    type Values = {
+      first: string;
+      second: string;
+    };
+    let resolveSecond: (value: string) => void = () => undefined;
+    const second = new Promise<string>((resolvePromise) => {
+      resolveSecond = resolvePromise;
+    });
+    const pending = new Map<PropertyKey, Promise<unknown>>();
+    const resolved: Partial<Values> = {};
+    const result = getWithPlan<Values, "second">(
+      resolved,
+      {
+        first: () => "first",
+        second: () => second,
+      },
+      "second",
+      ["first", "second"],
+      pending,
+    );
+
+    expect(resolved).toEqual({ first: "first" });
+    expect(pending.size).toBe(1);
+    resolveSecond("second");
+    await expect(result).resolves.toBe("second");
+    expect(pending.size).toBe(0);
+    expect(resolved).toEqual({ first: "first", second: "second" });
+  });
+
   it("resolves a shared dependency only once across concurrent requests", async () => {
     type Values = {
       shared: string;

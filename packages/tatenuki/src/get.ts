@@ -72,26 +72,38 @@ export function createResolveAllPlan(
   return createVisitPlan(graph, resolved, Reflect.ownKeys(graph));
 }
 
-async function runGetPlan<T extends UnknownObject>(
+function runGetPlan<T extends UnknownObject>(
   resolved: Partial<T>,
   factories: Partial<Record<keyof T, UnknownFactory<T>>>,
   plan: readonly PropertyKey[],
   pending?: Map<PropertyKey, Promise<unknown>>,
   onFactoryResult?: (value: unknown) => void,
   beforeEach?: () => void,
-): Promise<void> {
+  startIndex = 0,
+): void | Promise<void> {
   let pendingMap = pending;
 
-  for (const dependencyKey of plan) {
+  for (let index = startIndex; index < plan.length; index += 1) {
+    const dependencyKey = plan[index];
     beforeEach?.();
     if (Object.hasOwn(resolved, dependencyKey)) {
       continue;
     }
 
-    const pendingValue = pendingMap?.get(dependencyKey);
-    if (pendingValue) {
-      resolved[dependencyKey as keyof T] = (await pendingValue) as T[keyof T];
-      continue;
+    if (pendingMap !== undefined && pendingMap.size > 0) {
+      const pendingValue = pendingMap.get(dependencyKey);
+      if (pendingValue) {
+        return continueGetPlanAfterPending(
+          resolved,
+          factories,
+          plan,
+          pendingMap,
+          onFactoryResult,
+          beforeEach,
+          index,
+          pendingValue,
+        );
+      }
     }
 
     const factory = factories[dependencyKey as keyof T];
@@ -104,17 +116,78 @@ async function runGetPlan<T extends UnknownObject>(
       const pendingResult = Promise.resolve(factoryResult);
       pendingMap ??= new Map();
       pendingMap.set(dependencyKey, pendingResult);
-      try {
-        const value = await pendingResult;
-        onFactoryResult?.(value);
-        resolved[dependencyKey as keyof T] = value as T[keyof T];
-      } finally {
-        pendingMap.delete(dependencyKey);
-      }
-    } else {
-      onFactoryResult?.(factoryResult);
-      resolved[dependencyKey as keyof T] = factoryResult as T[keyof T];
+      return continueGetPlanAfterFactory(
+        resolved,
+        factories,
+        plan,
+        pendingMap,
+        onFactoryResult,
+        beforeEach,
+        index,
+        pendingResult,
+      );
     }
+
+    onFactoryResult?.(factoryResult);
+    resolved[dependencyKey as keyof T] = factoryResult as T[keyof T];
+  }
+}
+
+async function continueGetPlanAfterPending<T extends UnknownObject>(
+  resolved: Partial<T>,
+  factories: Partial<Record<keyof T, UnknownFactory<T>>>,
+  plan: readonly PropertyKey[],
+  pendingMap: Map<PropertyKey, Promise<unknown>>,
+  onFactoryResult: ((value: unknown) => void) | undefined,
+  beforeEach: (() => void) | undefined,
+  index: number,
+  pendingValue: Promise<unknown>,
+): Promise<void> {
+  const dependencyKey = plan[index];
+  resolved[dependencyKey as keyof T] = (await pendingValue) as T[keyof T];
+  const pendingWork = runGetPlan(
+    resolved,
+    factories,
+    plan,
+    pendingMap,
+    onFactoryResult,
+    beforeEach,
+    index + 1,
+  );
+  if (pendingWork) {
+    await pendingWork;
+  }
+}
+
+async function continueGetPlanAfterFactory<T extends UnknownObject>(
+  resolved: Partial<T>,
+  factories: Partial<Record<keyof T, UnknownFactory<T>>>,
+  plan: readonly PropertyKey[],
+  pendingMap: Map<PropertyKey, Promise<unknown>>,
+  onFactoryResult: ((value: unknown) => void) | undefined,
+  beforeEach: (() => void) | undefined,
+  index: number,
+  pendingResult: Promise<unknown>,
+): Promise<void> {
+  const dependencyKey = plan[index];
+  try {
+    const value = await pendingResult;
+    onFactoryResult?.(value);
+    resolved[dependencyKey as keyof T] = value as T[keyof T];
+  } finally {
+    pendingMap.delete(dependencyKey);
+  }
+  const pendingWork = runGetPlan(
+    resolved,
+    factories,
+    plan,
+    pendingMap,
+    onFactoryResult,
+    beforeEach,
+    index + 1,
+  );
+  if (pendingWork) {
+    await pendingWork;
   }
 }
 
@@ -126,7 +199,10 @@ export async function resolveWithPlan<T extends UnknownObject>(
   onFactoryResult?: (value: unknown) => void,
   beforeEach?: () => void,
 ): Promise<void> {
-  await runGetPlan(resolved, factories, plan, pending, onFactoryResult, beforeEach);
+  const pendingWork = runGetPlan(resolved, factories, plan, pending, onFactoryResult, beforeEach);
+  if (pendingWork) {
+    await pendingWork;
+  }
 }
 
 export async function get<T extends UnknownObject, K extends keyof T>(
@@ -153,6 +229,9 @@ export async function getWithPlan<T extends UnknownObject, K extends keyof T>(
   pending?: Map<PropertyKey, Promise<unknown>>,
   onFactoryResult?: (value: unknown) => void,
 ): Promise<T[K]> {
-  await runGetPlan(resolved, factories, plan, pending, onFactoryResult);
+  const pendingWork = runGetPlan(resolved, factories, plan, pending, onFactoryResult);
+  if (pendingWork) {
+    await pendingWork;
+  }
   return resolved[key] as T[K];
 }
