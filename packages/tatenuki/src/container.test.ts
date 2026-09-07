@@ -360,6 +360,80 @@ describe("Container", () => {
     expect(Reflect.get(container, "owned")).toBeUndefined();
   });
 
+  it("does not track initial value identities until the first factory result", async () => {
+    type Values = {
+      seed: string;
+      first: object;
+    };
+    const graph = {
+      seed: [],
+      first: ["seed"],
+    } as const;
+    const first = {};
+    const container = defineContainer<Values>()
+      .graph(graph)
+      .factories({
+        first: () => first,
+      })
+      .build({ seed: "seed" });
+
+    expect(Reflect.get(container, "known")).toBeUndefined();
+
+    await container.get("first");
+
+    expect(Reflect.get(container, "known")).toEqual(["seed", first]);
+  });
+
+  it("borrows a factory result that is identical to an effective initial value", async () => {
+    type Values = {
+      built: Disposable;
+      copied: Disposable;
+    };
+    const graph = {
+      built: [],
+      copied: ["built"],
+    } as const;
+    const disposeBuilt = vi.fn();
+    const built = { [Symbol.dispose]: disposeBuilt };
+    const container = defineContainer<Values>()
+      .graph(graph)
+      .factories({
+        copied: ({ built }) => built,
+      })
+      .build({ built });
+
+    await container.get("copied");
+    await container.dispose();
+
+    expect(disposeBuilt).not.toHaveBeenCalled();
+    expect(Reflect.get(container, "owned")).toBeUndefined();
+  });
+
+  it("disposes a duplicate owned factory result once", async () => {
+    type Values = {
+      first: Disposable;
+      second: Disposable;
+    };
+    const graph = {
+      first: [],
+      second: ["first"],
+    } as const;
+    const disposeResource = vi.fn();
+    const resource = { [Symbol.dispose]: disposeResource };
+    const container = defineContainer<Values>()
+      .graph(graph)
+      .factories({
+        first: () => resource,
+        second: () => resource,
+      })
+      .build({});
+
+    await container.get("second");
+    await container.dispose();
+
+    expect(disposeResource).toHaveBeenCalledOnce();
+  });
+
   it("does not start in-flight tracking for a cached value", async () => {
     const container = new Container<Definition, typeof dependencies>(dependencies)
       .factory({
