@@ -94,7 +94,7 @@ class FullyDefinedContainer<
   private readonly dependencies: D;
   private readonly registeredFactories: PartialFactories<T, D, FactoryKeys>;
   private readonly pending = new Map<PropertyKey, Promise<unknown>>();
-  private known: unknown[] | Set<unknown>;
+  private known: unknown[] | Set<unknown> | undefined;
   private owned: DisposableValue[] | undefined;
   private inflight: Promise<unknown> | Set<Promise<unknown>> | undefined;
   private readonly planCache: GetPlanCache;
@@ -116,7 +116,6 @@ class FullyDefinedContainer<
     this.resolved = { ...values, ...overrides } as Partial<T>;
     this.planCache = planCache;
     this.initialResolvedKeys = Reflect.ownKeys(this.resolved);
-    this.known = this.initialResolvedKeys.map((key) => this.resolved[key as keyof T]);
   }
 
   async get<K extends keyof T>(key: K): Promise<T[K]> {
@@ -248,24 +247,29 @@ class FullyDefinedContainer<
   }
 
   private addKnownValue(value: unknown): boolean {
-    if (Array.isArray(this.known)) {
-      if (this.known.includes(value)) {
+    let known = (this.known ??= this.initialResolvedKeys.map(
+      (key) => this.resolved[key as keyof T],
+    ));
+
+    if (Array.isArray(known)) {
+      if (known.includes(value)) {
         return false;
       }
 
-      if (this.known.length < KNOWN_VALUE_ARRAY_LIMIT) {
-        this.known.push(value);
+      if (known.length < KNOWN_VALUE_ARRAY_LIMIT) {
+        known.push(value);
         return true;
       }
 
-      this.known = new Set(this.known);
+      known = new Set(known);
+      this.known = known;
     }
 
-    if (this.known.has(value)) {
+    if (known.has(value)) {
       return false;
     }
 
-    this.known.add(value);
+    known.add(value);
     return true;
   }
 
