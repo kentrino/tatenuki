@@ -94,6 +94,9 @@ class FullyDefinedContainer<
   private readonly dependencies: D;
   private readonly registeredFactories: PartialFactories<T, D, FactoryKeys>;
   private readonly pending = new Map<PropertyKey, Promise<unknown>>();
+  private pendingRootKey: PropertyKey | undefined;
+  private pendingRootWork: Promise<void> | undefined;
+  private pendingRoots: Map<PropertyKey, Promise<void>> | undefined;
   private known: unknown[] | Set<unknown> | undefined;
   private owned: DisposableValue[] | undefined;
   private inflight: Promise<unknown> | Set<Promise<unknown>> | undefined;
@@ -127,6 +130,13 @@ class FullyDefinedContainer<
       return this.resolved[key] as T[K];
     }
 
+    const pendingRoot =
+      this.pendingRootKey === key ? this.pendingRootWork : this.pendingRoots?.get(key);
+    if (pendingRoot) {
+      await pendingRoot;
+      return this.resolved[key] as T[K];
+    }
+
     const pendingWork = runGetPlan(
       this.resolved,
       this.registeredFactories as unknown as Partial<Record<keyof T, (dependencies: T) => unknown>>,
@@ -138,12 +148,12 @@ class FullyDefinedContainer<
       return this.resolved[key] as T[K];
     }
 
-    this.trackInflight(pendingWork);
+    this.trackPendingRoot(key, pendingWork);
     try {
       await pendingWork;
       return this.resolved[key] as T[K];
     } finally {
-      this.untrackInflight(pendingWork);
+      this.untrackPendingRoot(key, pendingWork);
     }
   }
 
@@ -275,6 +285,26 @@ class FullyDefinedContainer<
 
     known.add(value);
     return true;
+  }
+
+  private trackPendingRoot(key: PropertyKey, promise: Promise<void>): void {
+    if (!this.pendingRootWork) {
+      this.pendingRootKey = key;
+      this.pendingRootWork = promise;
+    } else {
+      (this.pendingRoots ??= new Map()).set(key, promise);
+    }
+    this.trackInflight(promise);
+  }
+
+  private untrackPendingRoot(key: PropertyKey, promise: Promise<void>): void {
+    if (this.pendingRootWork === promise) {
+      this.pendingRootKey = undefined;
+      this.pendingRootWork = undefined;
+    } else {
+      this.pendingRoots!.delete(key);
+    }
+    this.untrackInflight(promise);
   }
 
   private trackInflight(promise: Promise<unknown>): void {

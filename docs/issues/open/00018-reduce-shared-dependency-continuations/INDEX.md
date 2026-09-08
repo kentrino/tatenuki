@@ -36,7 +36,7 @@ pnpm --filter @tatenuki/benchmark-container-comparison bench src/async-resolutio
 
 Profile the factory-owner and waiting-caller paths, then experiment with reducing nested Promise continuations or redundant resolved-state updates while retaining one owner for factory finalization. Only share dependency completion if publication, ownership registration, and error propagation remain correctly ordered. Avoid introducing per-node state whose construction cost outweighs the gain.
 
-[Sharing a pending root resolution](../00017-share-pending-root-resolution/INDEX.md) only joins callers requesting the same key; the two roots here are distinct. Re-measure this case after that change before adding another optimization. This issue does not propose starting independent factories in parallel.
+[Sharing a pending root resolution](../../closed/00017-share-pending-root-resolution/INDEX.md) only joins callers requesting the same key; the two roots here are distinct. Re-measure this case after that change before adding another optimization. This issue does not propose starting independent factories in parallel.
 
 # Acceptance
 

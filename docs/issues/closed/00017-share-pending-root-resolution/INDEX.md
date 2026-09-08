@@ -6,7 +6,7 @@ source: async-resolution-benchmark
 
 # Abstract
 
-Investigate sharing an unfinished root resolution between concurrent `get()` calls for the same key. Factory results are already shared; the candidate improvement is avoiding repeated plan execution and in-flight bookkeeping for callers waiting for the same result.
+Share an unfinished root resolution between concurrent `get()` calls for the same key. Preserve factory invocation counts, value identity, container isolation, retries, and disposal behavior.
 
 # Problem
 
@@ -43,4 +43,10 @@ This concerns unfinished resolution, unlike [the reverted fulfilled-Promise cach
 - Preserve the Promise-returning API, factory invocation counts, shared value identity, container isolation, and existing retry behavior after rejection. Public Promise identity need not change.
 - Verify concurrent success and rejection, retry after failure, and disposal during pending resolution. Disposal must await owned work and dispose each owned value once; new requests after disposal must still reject. Check interaction with overlapping `resolveAll()` calls.
 - Compare baseline and candidate repeatedly on the same machine, including this eight-caller case and first-get, cached-get, full-resolution, construction, and lifecycle controls. Assess gains against reported error and InferDI control movement; reject changes that merely move cost into ordinary single-caller cases.
-- Keep different-root optimization separate: see [shared dependency continuations](../00018-reduce-shared-dependency-continuations/INDEX.md).
+- Keep different-root optimization separate: see [shared dependency continuations](../../open/00018-reduce-shared-dependency-continuations/INDEX.md).
+
+# Implementation
+
+Each container stores its first pending root key and plan directly. A lazy map holds additional pending roots. Later callers await the existing plan without repeating traversal or in-flight registration. The first caller clears its root state on fulfillment or rejection. Cached and synchronous gets do not allocate the map.
+
+Eight regression cases cover reuse of the first pending slot, concurrent value identity and container isolation, dependency and root failures with retries, both call orders with `resolveAll()`, and disposal with and without bulk resolution. The focused tests, package check, and `pnpm ready` pass.
