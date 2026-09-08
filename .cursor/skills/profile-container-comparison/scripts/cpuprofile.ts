@@ -28,6 +28,8 @@ export type FrameRow = {
   percent: number;
   functionName: string;
   url: string;
+  line: number;
+  column: number;
   bucket: Bucket;
 };
 
@@ -107,7 +109,7 @@ export function summarizeCpuProfile(file: string, profile: CpuProfile): ProfileS
     }
   }
 
-  const grouped = new Map<string, { samples: number; functionName: string; url: string }>();
+  const grouped = new Map<string, Omit<FrameRow, "percent" | "bucket">>();
   let samples = 0;
   for (const [id, count] of counts) {
     const node = byId.get(id);
@@ -117,10 +119,13 @@ export function summarizeCpuProfile(file: string, profile: CpuProfile): ProfileS
     samples += count;
     const functionName = node.callFrame.functionName || "(anonymous)";
     const url = shortenUrl(node.callFrame.url);
-    const key = `${functionName}\t${url}`;
+    // V8 positions are zero-based; zero in the report means unavailable.
+    const line = node.callFrame.lineNumber + 1;
+    const column = node.callFrame.columnNumber + 1;
+    const key = JSON.stringify([functionName, node.callFrame.url, line, column]);
     const current = grouped.get(key);
     if (current === undefined) {
-      grouped.set(key, { samples: count, functionName, url });
+      grouped.set(key, { samples: count, functionName, url, line, column });
     } else {
       current.samples += count;
     }
@@ -132,6 +137,8 @@ export function summarizeCpuProfile(file: string, profile: CpuProfile): ProfileS
       percent: samples === 0 ? 0 : (100 * row.samples) / samples,
       functionName: row.functionName,
       url: row.url,
+      line: row.line,
+      column: row.column,
       bucket: classifyFrame(row.functionName, row.url),
     }))
     .sort(
@@ -170,6 +177,11 @@ function formatPercent(value: number): string {
   return `${value.toFixed(1)}%`;
 }
 
+function frameLocation(row: FrameRow): string {
+  if (!row.url) return "-";
+  return row.line > 0 ? `${row.url}:${row.line}:${row.column}` : row.url;
+}
+
 function renderFrameRows(frames: readonly FrameRow[], limit: number): string {
   const rows = frames.slice(0, limit);
   return rows
@@ -177,7 +189,7 @@ function renderFrameRows(frames: readonly FrameRow[], limit: number): string {
       const samples = String(row.samples).padStart(5);
       const percent = formatPercent(row.percent).padStart(6);
       const bucket = row.bucket.padEnd(12);
-      const location = row.url === "" ? "" : ` ${row.url}`;
+      const location = ` ${frameLocation(row)}`;
       return `${samples}  ${percent}  ${bucket}  ${row.functionName}${location}`;
     })
     .join("\n");
@@ -206,8 +218,8 @@ ${bucketLines}
 Top frames
 ${renderFrameRows(summary.frames, limit)}
 
-Library frames
-${libraryFrames.length === 0 ? "(none)" : renderFrameRows(libraryFrames, limit)}`;
+Library frames (all sampled locations)
+${libraryFrames.length === 0 ? "(none)" : renderFrameRows(libraryFrames, libraryFrames.length)}`;
 }
 
 export function renderMarkdownSummary(summary: ProfileSummary, limit: number): string {
@@ -222,7 +234,14 @@ export function renderMarkdownSummary(summary: ProfileSummary, limit: number): s
     .slice(0, limit)
     .map(
       (row) =>
-        `| ${row.samples} | ${formatPercent(row.percent)} | ${row.bucket} | \`${row.functionName}\` | \`${row.url || "-"}\` |`,
+        `| ${row.samples} | ${formatPercent(row.percent)} | ${row.bucket} | \`${row.functionName}\` | \`${frameLocation(row)}\` |`,
+    )
+    .join("\n");
+  const tatenukiRows = summary.frames
+    .filter((row) => row.bucket === "tatenuki")
+    .map(
+      (row) =>
+        `| ${row.samples} | ${formatPercent(row.percent)} | \`${row.functionName}\` | \`${frameLocation(row)}\` |`,
     )
     .join("\n");
 
@@ -242,5 +261,15 @@ ${bucketRows}
 | Samples | Share | Bucket | Function | File |
 | ---: | ---: | --- | --- | --- |
 ${frameRows}
+
+### Tatenuki source locations (all sampled locations)
+
+Shares use all profile self samples. Locations identify function starts, not hot statements.
+Match locations against the captured source revision to recover class names and TypeScript signatures.
+Absent frames do not prove zero cost; optimized code can inline functions.
+
+| Self samples | Share | Function | File:line:column (1-based) |
+| ---: | ---: | --- | --- |
+${tatenukiRows || "| - | - | (none) | - |"}
 `;
 }

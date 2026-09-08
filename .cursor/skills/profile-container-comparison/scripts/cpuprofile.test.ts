@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { classifyFrame, parseCpuProfile, shortenUrl, summarizeCpuProfile } from "./cpuprofile.ts";
+import {
+  classifyFrame,
+  parseCpuProfile,
+  renderMarkdownSummary,
+  shortenUrl,
+  summarizeCpuProfile,
+} from "./cpuprofile.ts";
 
 describe("classifyFrame", () => {
   it("puts tatenuki sources in the tatenuki bucket", () => {
@@ -33,6 +39,33 @@ describe("shortenUrl", () => {
 });
 
 describe("summarizeCpuProfile", () => {
+  it("separates same-name methods and closures while merging identical source locations", () => {
+    const callFrame = {
+      functionName: "get",
+      url: "file:///repo/packages/tatenuki/src/container.ts",
+      lineNumber: 10,
+      columnNumber: 2,
+    };
+    const summary = summarizeCpuProfile("sample.cpuprofile", {
+      nodes: [
+        { id: 1, callFrame },
+        { id: 2, callFrame: { ...callFrame, lineNumber: 20 } },
+        { id: 3, callFrame: { ...callFrame, columnNumber: 8 } },
+        { id: 4, callFrame },
+      ],
+      samples: [1, 1, 2, 3, 4],
+    });
+    assert.equal(summary.samples, 5);
+    assert.equal(summary.frames.length, 3);
+    assert.equal(summary.frames[0].samples, 3);
+    assert.equal(summary.frames[0].line, 11);
+    assert.equal(summary.frames[0].column, 3);
+    assert.equal(summary.buckets[0].samples, 5);
+    const markdown = renderMarkdownSummary(summary, 1);
+    assert.ok(markdown.includes("container.ts:21:3"));
+    assert.ok(markdown.includes("container.ts:11:9"));
+  });
+
   it("groups self samples by function and file", () => {
     const profile = parseCpuProfile(
       JSON.stringify({
