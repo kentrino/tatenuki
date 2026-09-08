@@ -43,7 +43,7 @@ This concerns unfinished resolution, unlike [the reverted fulfilled-Promise cach
 - Preserve the Promise-returning API, factory invocation counts, shared value identity, container isolation, and existing retry behavior after rejection. Public Promise identity need not change.
 - Verify concurrent success and rejection, retry after failure, and disposal during pending resolution. Disposal must await owned work and dispose each owned value once; new requests after disposal must still reject. Check interaction with overlapping `resolveAll()` calls.
 - Compare baseline and candidate repeatedly on the same machine, including this eight-caller case and first-get, cached-get, full-resolution, construction, and lifecycle controls. Assess gains against reported error and InferDI control movement; reject changes that merely move cost into ordinary single-caller cases.
-- Keep different-root optimization separate: see [shared dependency continuations](../../open/00018-reduce-shared-dependency-continuations/INDEX.md).
+- Keep different-root optimization separate: see [shared dependency continuations](../00018-reduce-shared-dependency-continuations/INDEX.md).
 
 # Implementation
 
