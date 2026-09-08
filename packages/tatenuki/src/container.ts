@@ -133,7 +133,7 @@ class FullyDefinedContainer<
       key,
       this.getPlan(key),
       this.pending,
-      (value) => this.onFactoryResult(value),
+      this.onFactoryResult,
     );
     this.trackInflight(promise);
     try {
@@ -157,7 +157,7 @@ class FullyDefinedContainer<
         >,
         plan,
         this.pending,
-        (value) => this.onFactoryResult(value),
+        this.onFactoryResult,
         () => {
           if (this.lifecycle.disposePromise) {
             throw new Error("Container is disposed");
@@ -235,7 +235,7 @@ class FullyDefinedContainer<
     return snapshot;
   }
 
-  private onFactoryResult(value: unknown): void {
+  private readonly onFactoryResult = (value: unknown): void => {
     this.hasFactoryResult = true;
     if (!this.addKnownValue(value)) {
       return;
@@ -244,7 +244,7 @@ class FullyDefinedContainer<
     if (isDisposable(value)) {
       (this.owned ??= []).push(value);
     }
-  }
+  };
 
   private addKnownValue(value: unknown): boolean {
     let known = (this.known ??= this.initialResolvedKeys.map(
