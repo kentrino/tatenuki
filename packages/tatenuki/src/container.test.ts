@@ -1,7 +1,7 @@
 import { runInNewContext } from "node:vm";
 import { describe, expect, expectTypeOf, it, vi } from "vite-plus/test";
 import { alias, Container, defineContainer, inject } from "./container.ts";
-import { get } from "./get.ts";
+import { get, getWithPlan } from "./get.ts";
 import { resolve } from "./resolve.ts";
 import type { DependencyGraph } from "./type.ts";
 
@@ -1170,6 +1170,26 @@ describe("resolution", () => {
     await expect(get(graph, resolved, {}, "disabled")).resolves.toBe(false);
     await expect(get(graph, resolved, {}, "empty")).resolves.toBe("");
     await expect(get(graph, resolved, {}, "nil")).resolves.toBeNull();
+  });
+
+  it("skips planned factories when the requested key is already resolved", async () => {
+    type Values = {
+      zero: number;
+      empty: string;
+    };
+    const factories = {
+      zero: vi.fn(() => 1),
+      empty: vi.fn(() => "filled"),
+    };
+
+    await expect(
+      getWithPlan<Values, "zero">({ zero: 0 }, factories, "zero", ["zero"]),
+    ).resolves.toBe(0);
+    await expect(
+      getWithPlan<Values, "empty">({ empty: "" }, factories, "empty", ["empty"]),
+    ).resolves.toBe("");
+    expect(factories.zero).not.toHaveBeenCalled();
+    expect(factories.empty).not.toHaveBeenCalled();
   });
 
   it("resolves a shared dependency only once across concurrent requests", async () => {

@@ -118,18 +118,6 @@ async function runGetPlan<T extends UnknownObject>(
   }
 }
 
-async function getFromPlan<T extends UnknownObject, K extends keyof T>(
-  resolved: Partial<T>,
-  factories: Partial<Record<keyof T, UnknownFactory<T>>>,
-  key: K,
-  plan: readonly PropertyKey[],
-  pending?: Map<PropertyKey, Promise<unknown>>,
-  onFactoryResult?: (value: unknown) => void,
-): Promise<T[K]> {
-  await runGetPlan(resolved, factories, plan, pending, onFactoryResult);
-  return resolved[key] as T[K];
-}
-
 export async function resolveWithPlan<T extends UnknownObject>(
   resolved: Partial<T>,
   factories: Partial<Record<keyof T, UnknownFactory<T>>>,
@@ -154,7 +142,7 @@ export async function get<T extends UnknownObject, K extends keyof T>(
   }
 
   const plan = createGetPlan(graph, resolved, key);
-  return getFromPlan(resolved, factories, key, plan, pending, onFactoryResult);
+  return getWithPlan(resolved, factories, key, plan, pending, onFactoryResult);
 }
 
 export async function getWithPlan<T extends UnknownObject, K extends keyof T>(
@@ -165,9 +153,6 @@ export async function getWithPlan<T extends UnknownObject, K extends keyof T>(
   pending?: Map<PropertyKey, Promise<unknown>>,
   onFactoryResult?: (value: unknown) => void,
 ): Promise<T[K]> {
-  if (Object.hasOwn(resolved, key)) {
-    return resolved[key] as T[K];
-  }
-
-  return getFromPlan(resolved, factories, key, plan, pending, onFactoryResult);
+  await runGetPlan(resolved, factories, plan, pending, onFactoryResult);
+  return resolved[key] as T[K];
 }
