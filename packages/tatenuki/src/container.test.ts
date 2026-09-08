@@ -434,26 +434,6 @@ describe("Container", () => {
     expect(disposeResource).toHaveBeenCalledOnce();
   });
 
-  it("reuses one fulfilled promise for a cached get and still rejects after dispose", async () => {
-    const container = new Container<Definition, typeof dependencies>(dependencies)
-      .factory({
-        apiClient: inject(ApiClient),
-        service: inject(Service),
-      })
-      .value({ baseUrl: "https://example.com" });
-    const service = await container.get("service");
-
-    const first = container.get("service");
-    const second = container.get("service");
-
-    expect(first).toBeInstanceOf(Promise);
-    expect(first).toBe(second);
-    await expect(first).resolves.toBe(service);
-
-    await container.dispose();
-    await expect(container.get("service")).rejects.toThrow("Container is disposed");
-  });
-
   it("does not start in-flight tracking for a cached value", async () => {
     const container = new Container<Definition, typeof dependencies>(dependencies)
       .factory({

@@ -1,6 +1,6 @@
 # Benchmark comparison
 
-Compared baseline `f1e9b0f` with optimized revision `2696978` using Vitest `4.1.10`. Changes below use throughput (`hz`; higher is better) from one run per revision.
+Compared baseline `f1e9b0f` with optimized revision `2696978` using Vitest `4.1.10`. Changes below use throughput (`hz`; higher is better) from one run per revision. The change was reverted.
 
 ## Main improvement
 
