@@ -101,6 +101,7 @@ class FullyDefinedContainer<
   private readonly initialResolvedKeys: readonly PropertyKey[];
   private initialResolvedForPlan: Partial<T> | undefined;
   private hasFactoryResult = false;
+  private fulfilledGets: Map<PropertyKey, Promise<unknown>> | undefined;
   private readonly lifecycle: ContainerLifecycle = { disposePromise: undefined };
   readonly resolved: Partial<T>;
 
@@ -118,32 +119,42 @@ class FullyDefinedContainer<
     this.initialResolvedKeys = Reflect.ownKeys(this.resolved);
   }
 
-  async get<K extends keyof T>(key: K): Promise<T[K]> {
+  get<K extends keyof T>(key: K): Promise<T[K]> {
     if (this.lifecycle.disposePromise) {
-      throw new Error("Container is disposed");
+      return Promise.reject(new Error("Container is disposed"));
     }
 
     if (Object.hasOwn(this.resolved, key)) {
-      return this.resolved[key] as T[K];
+      return this.fulfilledGet(key);
     }
 
-    const pendingWork = runGetPlan(
-      this.resolved,
-      this.registeredFactories as unknown as Partial<Record<keyof T, (dependencies: T) => unknown>>,
-      this.getPlan(key),
-      this.pending,
-      (value) => this.onFactoryResult(value),
-    );
-    if (!pendingWork) {
-      return this.resolved[key] as T[K];
-    }
-
-    this.trackInflight(pendingWork);
     try {
-      await pendingWork;
-      return this.resolved[key] as T[K];
-    } finally {
-      this.untrackInflight(pendingWork);
+      const pendingWork = runGetPlan(
+        this.resolved,
+        this.registeredFactories as unknown as Partial<
+          Record<keyof T, (dependencies: T) => unknown>
+        >,
+        this.getPlan(key),
+        this.pending,
+        (value) => this.onFactoryResult(value),
+      );
+      if (!pendingWork) {
+        return Promise.resolve(this.resolved[key] as T[K]);
+      }
+
+      this.trackInflight(pendingWork);
+      return pendingWork.then(
+        () => {
+          this.untrackInflight(pendingWork);
+          return this.resolved[key] as T[K];
+        },
+        (error: unknown) => {
+          this.untrackInflight(pendingWork);
+          throw error;
+        },
+      );
+    } catch (error) {
+      return Promise.reject(error);
     }
   }
 
@@ -237,6 +248,18 @@ class FullyDefinedContainer<
     }
     this.initialResolvedForPlan = snapshot;
     return snapshot;
+  }
+
+  private fulfilledGet<K extends keyof T>(key: K): Promise<T[K]> {
+    const fulfilledGets = (this.fulfilledGets ??= new Map());
+    const cached = fulfilledGets.get(key);
+    if (cached) {
+      return cached as Promise<T[K]>;
+    }
+
+    const promised = Promise.resolve(this.resolved[key] as T[K]);
+    fulfilledGets.set(key, promised);
+    return promised;
   }
 
   private onFactoryResult(value: unknown): void {
