@@ -72,8 +72,13 @@ InferDI uses fast mode.
 ## How to read the summary
 
 The summary counts V8 self samples.
-It groups frames by function name and file.
+It groups frames by function name, original URL, line, and column.
 It then assigns each group to a bucket.
+Positions are 1-based function starts, not hot statement locations.
+The Markdown summary lists every sampled tatenuki location, independent of `--limit`.
+Match each hot location to its class-qualified TypeScript signature in the captured revision.
+Include that signature and source link in the report.
+Do not infer zero cost from absent frames; V8 can inline functions.
 
 - `tatenuki` is code under `packages/tatenuki/`.
 - `inferdi` is code from `@inferdi/inferdi`.
@@ -86,6 +91,11 @@ Use library frames to name the cause.
 Use `runtime` GC share to judge allocation cost.
 Do not treat harness time as container cost.
 Do not compare `hz` from Vitest with `ns/op` from this script as one number.
+Tatenuki loops await `get()`; InferDI loops call synchronous `get()`.
+The first case reuses the tatenuki builder but registers InferDI factories in the loop.
+These cases do not isolate equal API work or cold tatenuki plan creation.
+GC samples do not identify allocation sites.
+Preserve old captures with `--output-dir .cpu-profile/<revision>/<run-name>` when you repeat a run.
 
 ## After the script
 

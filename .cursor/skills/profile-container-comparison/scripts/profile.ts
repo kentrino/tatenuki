@@ -238,9 +238,7 @@ async function commandRun(values: Record<string, string | undefined>): Promise<s
   }
 
   const revision = await gitOutput(repositoryRoot, "rev-parse", "--short", "HEAD");
-  const outputDir = resolve(
-    values["output-dir"] ?? join(repositoryRoot, ".cpu-profile", revision),
-  );
+  const outputDir = resolve(values["output-dir"] ?? join(repositoryRoot, ".cpu-profile", revision));
   const durationMs = parsePositiveInteger("duration-ms", values["duration-ms"], 2500);
   const fixedIterations =
     values.iterations === undefined
@@ -273,7 +271,10 @@ async function commandRun(values: Record<string, string | undefined>): Promise<s
     `# Container comparison profiles
 
 - Revision: \`${revision}\`
-- Command: \`node --experimental-strip-types ${scriptPath} run\`
+- Working tree: ${(await gitOutput(repositoryRoot, "status", "--porcelain")) ? "dirty (includes uncommitted changes)" : "clean"}
+- Node.js: \`${process.version}\`
+- Command argv: \`${JSON.stringify([process.execPath, ...process.execArgv, scriptPath, ...process.argv.slice(2)])}\`
+- Timings include profiler overhead and each scenario's sync or async loop.
 
 ${notes.map((note) => `- ${note}`).join("\n")}
 
