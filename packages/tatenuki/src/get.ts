@@ -72,7 +72,7 @@ export function createResolveAllPlan(
   return createVisitPlan(graph, resolved, Reflect.ownKeys(graph));
 }
 
-function runGetPlan<T extends UnknownObject>(
+export function runGetPlan<T extends UnknownObject>(
   resolved: Partial<T>,
   factories: Partial<Record<keyof T, UnknownFactory<T>>>,
   plan: readonly PropertyKey[],

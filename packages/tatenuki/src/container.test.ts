@@ -448,6 +448,25 @@ describe("Container", () => {
     expect(Reflect.get(container, "inflight")).toBeUndefined();
   });
 
+  it("does not start in-flight tracking for a synchronous factory get", async () => {
+    const container = new Container<Definition, typeof dependencies>(dependencies)
+      .factory({
+        apiClient: (values) => {
+          expect(Reflect.get(container, "inflight")).toBeUndefined();
+          return new ApiClient(values);
+        },
+        service: inject(Service),
+      })
+      .value({ baseUrl: "https://example.com" });
+
+    const pending = container.get("service");
+
+    expect(pending).toBeInstanceOf(Promise);
+    expect(Reflect.get(container, "inflight")).toBeUndefined();
+    await expect(pending).resolves.toBeInstanceOf(Service);
+    expect(Reflect.get(container, "inflight")).toBeUndefined();
+  });
+
   it("allocates an in-flight set only for concurrent resolutions", async () => {
     type Values = {
       first: string;

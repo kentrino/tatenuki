@@ -1,4 +1,4 @@
-import { createGetPlan, createResolveAllPlan, getWithPlan, resolveWithPlan } from "./get.ts";
+import { createGetPlan, createResolveAllPlan, resolveWithPlan, runGetPlan } from "./get.ts";
 import { resolve } from "./resolve.ts";
 import type { DependenciesOf, PartialFactories, PartialValues } from "./type.ts";
 
@@ -127,19 +127,23 @@ class FullyDefinedContainer<
       return this.resolved[key] as T[K];
     }
 
-    const promise = getWithPlan(
+    const pendingWork = runGetPlan(
       this.resolved,
       this.registeredFactories as unknown as Partial<Record<keyof T, (dependencies: T) => unknown>>,
-      key,
       this.getPlan(key),
       this.pending,
       (value) => this.onFactoryResult(value),
     );
-    this.trackInflight(promise);
+    if (!pendingWork) {
+      return this.resolved[key] as T[K];
+    }
+
+    this.trackInflight(pendingWork);
     try {
-      return await promise;
+      await pendingWork;
+      return this.resolved[key] as T[K];
     } finally {
-      this.untrackInflight(promise);
+      this.untrackInflight(pendingWork);
     }
   }
 
