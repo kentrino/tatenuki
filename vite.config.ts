@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     // Root `vp test` must load each package config so resolution
     // happens against that package's tsconfig, not the workspace root.
-    projects: ["packages/*"],
+    projects: ["packages/*", "examples/*"],
   },
   staged: {
     "*": "vp check --fix",
@@ -13,7 +13,7 @@ export default defineConfig({
     ignorePatterns: ["docs/**", "**/CHANGELOG.md"],
   },
   lint: {
-    ignorePatterns: ["docs/**"],
+    ignorePatterns: ["docs/**", ".cursor/skills/**"],
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
     rules: { "vite-plus/prefer-vite-plus-imports": "error" },
     options: { typeAware: true, typeCheck: true },

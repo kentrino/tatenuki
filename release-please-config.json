@@ -20,6 +20,11 @@
       "release-type": "node",
       "package-name": "tatenuki",
       "component": "tatenuki"
+    },
+    "packages/hono": {
+      "release-type": "node",
+      "package-name": "@tatenuki/hono",
+      "component": "hono"
     }
   }
 }

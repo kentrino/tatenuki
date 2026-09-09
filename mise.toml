@@ -4,3 +4,10 @@ pnpm = "11.20.0"
 
 [env._]
 path = ["{{config_root}}/node_modules/.bin"]
+
+[tasks.bench]
+run = "pnpm --filter @tatenuki/benchmark-container-comparison bench:json"
+
+[tasks.profile]
+description = "Capture or summarize container comparison CPU profiles"
+run = "node --experimental-strip-types .cursor/skills/profile-container-comparison/scripts/profile.ts"

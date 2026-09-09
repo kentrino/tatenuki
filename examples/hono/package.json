@@ -1,0 +1,21 @@
+{
+  "name": "@tatenuki/example-hono",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bench": "vp test bench src/app.bench.ts --run",
+    "check": "vp check",
+    "test": "vp test --run"
+  },
+  "dependencies": {
+    "@tatenuki/hono": "workspace:*",
+    "hono": "catalog:",
+    "tatenuki": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

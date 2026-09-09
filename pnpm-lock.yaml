@@ -205,6 +205,18 @@ settings:
 
 catalogs:
   default:
+    '@types/node':
+      specifier: ^26
+      version: 26.4.0
+    citty:
+      specifier: ^0.2.2
+      version: 0.2.2
+    hono:
+      specifier: ^4.13.5
+      version: 4.13.5
+    typescript:
+      specifier: ^7.0.2
+      version: 7.0.2
     vite-plus:
       specifier: 0.2.8
       version: 0.2.8
@@ -216,6 +228,83 @@ importers:
 
   .:
     devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.4.0
+      vite:
+        specifier: npm:@voidzero-dev/vite-plus-core@0.2.8
+        version: '@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.4.0)(typescript@7.0.2)(unrun@0.2.39)'
+      vite-plus:
+        specifier: 'catalog:'
+        version: 0.2.8(@types/node@26.4.0)(@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.4.0)(typescript@7.0.2)(unrun@0.2.39))(typescript@7.0.2)(unrun@0.2.39)
+
+  benchmarks/container-comparison:
+    dependencies:
+      '@inferdi/inferdi':
+        specifier: 6.0.2
+        version: 6.0.2
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.4.0
+      citty:
+        specifier: 'catalog:'
+        version: 0.2.2
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vite:
+        specifier: npm:@voidzero-dev/vite-plus-core@0.2.8
+        version: '@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.4.0)(typescript@7.0.2)(unrun@0.2.39)'
+      vite-plus:
+        specifier: 'catalog:'
+        version: 0.2.8(@types/node@26.4.0)(@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.4.0)(typescript@7.0.2)(unrun@0.2.39))(typescript@7.0.2)(unrun@0.2.39)
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@types/node@26.4.0)(@vitest/browser-preview@4.1.10(@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.4.0)(typescript@7.0.2)(unrun@0.2.39))(vitest@4.1.10))(@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.4.0)(typescript@7.0.2)(unrun@0.2.39))
+
+  examples/hono:
+    dependencies:
+      '@tatenuki/hono':
+        specifier: workspace:*
+        version: link:../../packages/hono
+      hono:
+        specifier: 'catalog:'
+        version: 4.13.5
+      tatenuki:
+        specifier: workspace:*
+        version: link:../../packages/tatenuki
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.4.0
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vite:
+        specifier: npm:@voidzero-dev/vite-plus-core@0.2.8
+        version: '@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.4.0)(typescript@7.0.2)(unrun@0.2.39)'
+      vite-plus:
+        specifier: 'catalog:'
+        version: 0.2.8(@types/node@26.4.0)(@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.4.0)(typescript@7.0.2)(unrun@0.2.39))(typescript@7.0.2)(unrun@0.2.39)
+
+  packages/hono:
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.4.0
+      hono:
+        specifier: 'catalog:'
+        version: 4.13.5
+      tatenuki:
+        specifier: workspace:*
+        version: link:../tatenuki
+      tsdown:
+        specifier: ^0.22.14
+        version: 0.22.14(typescript@7.0.2)(unrun@0.2.39)
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
       vite:
         specifier: npm:@voidzero-dev/vite-plus-core@0.2.8
         version: '@voidzero-dev/vite-plus-core@0.2.8(@types/node@26.4.0)(typescript@7.0.2)(unrun@0.2.39)'
@@ -266,6 +355,10 @@ packages:
 
   '@emnapi/wasi-threads@1.2.1':
     resolution: {integrity: sha512-uTII7OYF+/Mes/MrcIOYp5yOtSMLBWSIoLPpcgwipoiKbli6k322tcoFsxoIIxPDqW01SQGAgko4EzZi2BNv2w==}
+
+  '@inferdi/inferdi@6.0.2':
+    resolution: {integrity: sha512-pQz4pkQInEX8U1otD4ggzq/hL9CvFC+Ei8RF3xqZSsvHDn3oZJhaRiDrvrXQgRcgzuvWTTIYDn23/nYcqATADQ==}
+    engines: {node: '>=16.0.0'}
 
   '@jridgewell/sourcemap-codec@1.6.0':
     resolution: {integrity: sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw==}
@@ -1357,6 +1450,9 @@ packages:
     resolution: {integrity: sha512-NUPRluOfOiTKBKvWPtSD4PhFvWCqOi0BGStNWs57X9js7XGTprSmFoz5F0tWhR4WPjNeR9jXqdC7/UpSJTnlRg==}
     engines: {node: '>=18'}
 
+  citty@0.2.2:
+    resolution: {integrity: sha512-+6vJA3L98yv+IdfKGZHBNiGW5KHn22e/JwID0Strsz8h4S/csAu/OuICwxrg44k5MRiZHWIo8XXuJgQTriRP4w==}
+
   convert-source-map@2.0.0:
     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
 
@@ -1414,6 +1510,10 @@ packages:
   get-tsconfig@5.0.0-beta.5:
     resolution: {integrity: sha512-/6gFNr0N04nob252sTQxyFLi3eKFRqIg1I87YcqAMT1i6SQrSF6KujUEQrtrjMV0H/eejTCltLdDSTEMzHbnsQ==}
     engines: {node: '>=20.20.0'}
+
+  hono@4.13.5:
+    resolution: {integrity: sha512-O6+/eCYRkzzzy0rPWwKLiGBR1nFuUPZynnwjxN1MBA62NNqbT0wQEzQyK2gSO5yDIDB336sXQleAhOHrzlYyKw==}
+    engines: {node: '>=16.9.0'}
 
   hookable@6.1.1:
     resolution: {integrity: sha512-U9LYDy1CwhMCnprUfeAZWZGByVbhd54hwepegYTK7Pi5NvqEj63ifz5z+xukznehT7i6NIZRu89Ay1AZmRsLEQ==}
@@ -1830,6 +1930,8 @@ snapshots:
     dependencies:
       tslib: 2.8.1
     optional: true
+
+  '@inferdi/inferdi@6.0.2': {}
 
   '@jridgewell/sourcemap-codec@1.6.0': {}
 
@@ -2459,6 +2561,8 @@ snapshots:
 
   chai@6.2.2: {}
 
+  citty@0.2.2: {}
+
   convert-source-map@2.0.0: {}
 
   defu@6.1.7: {}
@@ -2491,6 +2595,8 @@ snapshots:
   get-tsconfig@5.0.0-beta.5:
     dependencies:
       resolve-pkg-maps: 1.0.0
+
+  hono@4.13.5: {}
 
   hookable@6.1.1: {}
 
